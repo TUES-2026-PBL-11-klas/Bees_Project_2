@@ -4,15 +4,6 @@ fastapi
 # ASGI server (runs the app)
 uvicorn
 
-# ORM (database access)
-sqlalchemy
-
-# Database migrations
-alembic
-
-# PostgreSQL driver
-psycopg2-binary
-
 # Data validation and settings
 pydantic
 pydantic-settings
@@ -26,3 +17,6 @@ httpx
 # Testing
 pytest
 pytest-asyncio
+
+mongoengine
+pymongo
