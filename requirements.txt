@@ -1,0 +1,28 @@
+# Web framework
+fastapi
+
+# ASGI server (runs the app)
+uvicorn
+
+# ORM (database access)
+sqlalchemy
+
+# Database migrations
+alembic
+
+# PostgreSQL driver
+psycopg2-binary
+
+# Data validation and settings
+pydantic
+pydantic-settings
+
+# Loads .env file
+python-dotenv
+
+# HTTP client (for calling external routing APIs)
+httpx
+
+# Testing
+pytest
+pytest-asyncio
