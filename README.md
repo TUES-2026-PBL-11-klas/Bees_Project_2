@@ -41,6 +41,13 @@ ClearWake Routing is a B2B API platform designed for logistics companies and car
 6. Run the application
 ```bash
    uvicorn src.main:app --reload --port 8080
+
+### Running with Docker
+```bash
+docker-compose up --build
+```
+
+API will be available at `http://localhost:8080/docs`
 ```
 
 7. Open the API docs

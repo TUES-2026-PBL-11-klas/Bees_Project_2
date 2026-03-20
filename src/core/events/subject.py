@@ -1,8 +1,8 @@
 from typing import List
 from threading import Lock
-from core.events.observer import Observer
+from src.core.events.observer import Observer
 
-class Zone:
+class ZoneSubject:
     def __init__(self, zone_id: str):
         self.zone_id = zone_id
         self.status = "open"
@@ -18,7 +18,7 @@ class Zone:
             self._observers.remove(observer)
 
     def notify(self):
-        from core.events.dispatcher import dispatch_notification
+        from src.core.events.dispatcher import dispatch_notification
         for observer in self._observers:
             dispatch_notification(observer, self.zone_id, self.status)
 
