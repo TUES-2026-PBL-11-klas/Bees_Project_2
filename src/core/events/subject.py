@@ -1,8 +1,8 @@
 from typing import List
 from threading import Lock
-from core.events.observer import Observer
+from src.core.events.observer import Observer
 
-class Zone:
+class ZoneSubject:
     def __init__(self, zone_id: str):
         self.zone_id = zone_id
         self.status = "open"

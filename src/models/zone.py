@@ -1,7 +1,7 @@
 import mongoengine as me
 from datetime import datetime
-from core.events.event import Event
-from core.events.dispatcher import dispatcher
+from src.core.events.event import Event
+from src.core.events.dispatcher import dispatcher
 
 class Zone(me.Document):
     name = me.StringField(required=True)
