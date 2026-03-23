@@ -212,7 +212,7 @@ class NavigationGraph:
                     heapq.heappush(open_heap, (tentative_g + h, neighbour_id))
 
         return None
-    
+
     def get_waypoint(self, node_id: str) -> Waypoint:
         return self._get_node(node_id)
 
