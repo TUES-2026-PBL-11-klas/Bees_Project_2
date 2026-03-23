@@ -1,21 +1,40 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from src.infrastructure.database.database import init_db, close_db
 from fastapi.staticfiles import StaticFiles
+from fastapi import HTTPException
 from fastapi.responses import HTMLResponse
+import traceback
 
-app = FastAPI(title="ClearWake Routing")
+from src.infrastructure.database.database import init_db, close_db
+from src.api.routers.zones import router as zones_router
 
-@app.on_event("startup")
-async def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_db()
 
-@app.on_event("shutdown")
-async def shutdown():
+    yield
+
     close_db()
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app = FastAPI(title="ClearWake Routing", lifespan=lifespan)
+
+app.include_router(zones_router)
+
+app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
 @app.get("/map", response_class=HTMLResponse)
 async def map_view():
-    with open("static/map.html") as f:
-        return f.read()
+    try:
+        with open("src/static/map.html", "r", encoding="utf-8") as f:
+            return f.read()
+
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Файлът 'src/static/map.html' не е намерен. Уверете се, че сте стартирали uvicorn от главната папка на проекта."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Сървърна грешка при четене: {str(e)}"
+        )
