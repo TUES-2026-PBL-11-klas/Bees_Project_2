@@ -14,7 +14,8 @@ def get_all_zones():
         zones = repo.get_all()
         if not zones:
             return []
-        return zones
+        import json
+        return [json.loads(zone.to_json()) for zone in zones]
     except Exception as e:
         print(f"Error in GET all zones: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -7,6 +7,7 @@ import traceback
 
 from src.infrastructure.database.database import init_db, close_db
 from src.api.routers.zones import router as zones_router
+from src.api.routers.routes import router as routes_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -19,6 +20,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="ClearWake Routing", lifespan=lifespan)
 
 app.include_router(zones_router)
+app.include_router(routes_router)
 
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
@@ -31,10 +33,10 @@ async def map_view():
     except FileNotFoundError:
         raise HTTPException(
             status_code=404,
-            detail="Файлът 'src/static/map.html' не е намерен. Уверете се, че сте стартирали uvicorn от главната папка на проекта."
+            detail="The file 'src/static/map.html' isn't found. Make sure you have started uvicorn from the main folder of the project."
         )
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Сървърна грешка при четене: {str(e)}"
+            detail=f"Server error while reading: {str(e)}"
         )

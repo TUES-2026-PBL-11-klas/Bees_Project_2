@@ -24,7 +24,7 @@
       });
     });
 
-  fetch('/api/v1/routes/ROUTE_ID')
+  fetch('/api/v1/routes/69c2c05654bc7d531fd5bd95')
     .then(r => r.json())
     .then(route => {
       const coords = route.waypoints.map(w => [w.coordinates[1], w.coordinates[0]]);
