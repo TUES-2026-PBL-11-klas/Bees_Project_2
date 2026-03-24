@@ -1,21 +1,8 @@
 import mongoengine as me
 from datetime import datetime
+from src.models.audit_log import AuditLog
 
-
-class AuditLog(me.Document):
-    event_type = me.StringField(required=True)
-    data = me.DictField(required=True)
-    created_at = me.DateTimeField(default=datetime.utcnow)
-
-    meta = {
-        "collection": "audit_logs",
-        "indexes": [
-            "event_type",
-            "created_at"
-        ]
-    }
 class AuditLogRepository:
-
     def create_log(self, event_type: str, data: dict):
         log = AuditLog(
             event_type=event_type,

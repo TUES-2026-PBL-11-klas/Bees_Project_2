@@ -1,4 +1,4 @@
-from core.events.observer import Observer
+from src.core.events.observer import Observer
 
 
 class ShipObserver(Observer):
