@@ -24,6 +24,11 @@ class EventDispatcher:
         observers = self._subscribers.get(event.event_type, [])
 
         self._audit_repo.create_log(event.event_type, event.data)
+        self._audit_repo.create_log(
+            event_type=event.event_type,
+            data=event.data,
+            entity_id=event.data.get("zone_id")
+        )
 
         for observer in observers:
             self._executor.submit(observer.update, event)
