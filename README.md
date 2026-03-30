@@ -10,7 +10,7 @@ ClearWake Routing is a B2B API platform designed for logistics companies and car
 
 1. Clone the repository
 ```bash
-   git clone <repo-url>
+   git clone <https://github.com/TUES-2026-PBL-11-klas/Bees_Project_2>
    cd Bees_Project_2
 ```
 
