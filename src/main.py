@@ -8,6 +8,9 @@ import traceback
 from src.infrastructure.database.database import init_db, close_db
 from src.api.routers.zones import router as zones_router
 from src.api.routers.routes import router as routes_router
+from src.api.routers.companies import router as companies_router
+from src.api.routers.vessels import router as vessels_router
+from src.core.config import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -21,6 +24,8 @@ app = FastAPI(title="ClearWake Routing", lifespan=lifespan)
 
 app.include_router(zones_router)
 app.include_router(routes_router)
+app.include_router(companies_router)
+app.include_router(vessels_router)
 
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
@@ -28,7 +33,13 @@ app.mount("/static", StaticFiles(directory="src/static"), name="static")
 async def map_view():
     try:
         with open("src/static/map.html", "r", encoding="utf-8") as f:
-            return f.read()
+            html = f.read()
+
+        rendered = (
+            html.replace("__MAP_PROVIDER__", settings.MAP_PROVIDER)
+            .replace("__GOOGLE_MAPS_API_KEY__", settings.GOOGLE_MAPS_API_KEY or "")
+        )
+        return rendered
 
     except FileNotFoundError:
         raise HTTPException(

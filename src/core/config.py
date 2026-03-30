@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     ROUTING_API_KEY: Optional[str] = None
     RATE_LIMIT_REQUESTS_PER_MINUTE: int = 60
     LOG_LEVEL: str = "info"
+    MAP_PROVIDER: str = "osm"
+    GOOGLE_MAPS_API_KEY: Optional[str] = None
 
     class Config:
         env_file = ".env"
