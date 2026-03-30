@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi import HTTPException
 from fastapi.responses import HTMLResponse
+from api.router import router as api_router
 import traceback
 
 from src.infrastructure.database.database import init_db, close_db
@@ -19,7 +20,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="ClearWake Routing", lifespan=lifespan)
 
 app.include_router(zones_router)
-
+app.include_router(api_router)
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
 @app.get("/map", response_class=HTMLResponse)
