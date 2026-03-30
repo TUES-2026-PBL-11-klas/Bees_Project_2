@@ -1,7 +1,7 @@
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
-from infrastructure.repositories.audit_log_repository import AuditLogRepository
+from src.infrastructure.repositories.audit_log_repository import AuditLogRepository
 
 class EventDispatcher:
     def __init__(self):
@@ -27,4 +27,5 @@ class EventDispatcher:
 
         for observer in observers:
             self._executor.submit(observer.update, event)
+
 dispatcher = EventDispatcher()
