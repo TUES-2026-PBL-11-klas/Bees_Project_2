@@ -20,6 +20,29 @@ class Vessel(me.Document):
 
     meta = {
         "collection": "vessels",
+        "allow_inheritance": True,
         "indexes": ["company_id", "imo_number", "current_status",
                     {"fields": ["current_position"], "cls": False, "sparse": True}]
     }
+
+    def get_capacity_info(self) -> str:
+        """Базов метод, който ще бъде презаписан (overridden) от наследниците."""
+        raise NotImplementedError("Subclasses must implement this method")
+
+
+class Tanker(Vessel):
+    """Специфичен модел за Танкери."""
+    barrels_capacity = me.IntField(default=0)
+    is_hazardous = me.BooleanField(default=True)
+
+    def get_capacity_info(self) -> str:
+        hazard = "Hazardous" if self.is_hazardous else "Non-hazardous"
+        return f"Capacity: {self.barrels_capacity} barrels ({hazard})"
+
+
+class ContainerShip(Vessel):
+    """Специфичен модел за Контейнеровози."""
+    teu_capacity = me.IntField(default=0)
+
+    def get_capacity_info(self) -> str:
+        return f"Capacity: {self.teu_capacity} TEU"
