@@ -16,6 +16,9 @@ class EcoStrategy(RoutingStrategy):
     def __init__(self):
         self.spatial_service = ZoneSpatialService()
 
+    def calculate(self, request):
+        return {"route": "eco path", "request": request}
+
     def calculate_route(self, graph: NavigationGraph, start_id: str, end_id: str) -> Optional[List[Waypoint]]:
         edges_to_unblock = []
 

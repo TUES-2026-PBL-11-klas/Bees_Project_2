@@ -8,9 +8,9 @@ import traceback
 
 from src.infrastructure.database.database import init_db, close_db
 from src.api.routers.zones import router as zones_router
-from src.api.routers.routes import router as routes_router
-from src.api.routers.companies import router as companies_router
-from src.api.routers.vessels import router as vessels_router
+from api.v1.routers.routes import router as routes_router
+from api.v1.routers.companies import router as companies_router
+from api.v1.routers.vessels import router as vessels_router
 from src.core.config import settings
 
 @asynccontextmanager
