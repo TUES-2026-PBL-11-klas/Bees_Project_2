@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from bson import ObjectId
 import json
+from src.core.services.routing_service import RoutingService
+from concurrent.futures import ThreadPoolExecutor
 
 from src.schemas.route import RouteCalculationSchema
 from src.core.routing.strategy import FastestStrategy, EcoStrategy
@@ -64,3 +66,46 @@ def get_route_by_id(route_id: str):
     if not route:
         raise HTTPException(status_code=404, detail="Route not found")
     return json.loads(route.to_json())
+
+executor = ThreadPoolExecutor(max_workers=5)
+
+@router.post("/calculate-batch")
+def calculate_routes_batch(requests: list[RouteCalculationSchema]):
+    graph = get_initialized_graph()
+
+    def calculate_single(request):
+        if request.optimization_mode == "fastest":
+            strategy = FastestStrategy()
+        elif request.optimization_mode == "eco":
+            strategy = EcoStrategy()
+        else:
+            return {"error": "Invalid optimization mode"}
+
+        try:
+            path = strategy.calculate_route(
+                graph,
+                request.start_node_id,
+                request.end_node_id
+            )
+        except KeyError as e:
+            return {"error": str(e)}
+
+        if not path:
+            return {"error": "No route found"}
+
+        waypoints = []
+        for idx, wp in enumerate(path):
+            waypoints.append({
+                "sequence": idx,
+                "coordinates": [wp.longitude, wp.latitude],
+                "point_type": "waypoint"
+            })
+
+        return {
+            "optimization_mode": request.optimization_mode,
+            "waypoints": waypoints
+        }
+
+    results = list(executor.map(calculate_single, requests))
+
+    return results
