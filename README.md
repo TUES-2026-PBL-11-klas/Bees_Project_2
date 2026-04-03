@@ -53,27 +53,28 @@ API will be available at http://localhost:8080/docs
 7. Open the API docs
 http://localhost:8080/docs
 
-### Google Maps (English Labels)
-1. Get a Google Maps JavaScript API key from Google Cloud.
-2. Put the key in .env:
+### Free Map View
+The map page uses a free CARTO basemap through Leaflet.
+
+1. Set the style in `.env`:
 
 ```bash
-MAP_PROVIDER=google
-GOOGLE_MAPS_API_KEY=your_real_google_maps_api_key
+MAP_PROVIDER=carto-voyager
 ```
 
-3. Restart the app:
+2. Restart the app:
 
 ```bash
 docker-compose up --build -d
 ```
 
-4. Open the map page:
+3. Open the map page:
 http://localhost:8080/map
 
 Notes:
-- The app already loads Google with language=en and region=US for English labels.
-- If the key is missing or invalid, the map falls back to OpenStreetMap.
+- `carto-voyager` gives the best default visual style.
+- `carto-positron` is a lighter alternative if you want a cleaner look.
+- The route and zone overlays still come from the app itself.
 
 ### Strategy Tests
 Run strategy-only tests:

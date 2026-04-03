@@ -32,10 +32,7 @@ async def map_view():
         with open("src/static/map.html", "r", encoding="utf-8") as f:
             html = f.read()
 
-        rendered = (
-            html.replace("__MAP_PROVIDER__", settings.MAP_PROVIDER)
-            .replace("__GOOGLE_MAPS_API_KEY__", settings.GOOGLE_MAPS_API_KEY or "")
-        )
+        rendered = html.replace("__MAP_PROVIDER__", settings.MAP_PROVIDER)
         return rendered
 
     except FileNotFoundError:
