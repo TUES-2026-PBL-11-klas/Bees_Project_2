@@ -35,13 +35,12 @@
 <div id="map"></div>
 <script>
   const MAP_PROVIDER = "__MAP_PROVIDER__";
-  const GOOGLE_MAPS_API_KEY = "__GOOGLE_MAPS_API_KEY__";
   const mapBanner = document.getElementById('mapBanner');
   const center = { lat: 20, lng: 50 };
   const routeId = new URLSearchParams(window.location.search).get('routeId');
 
   let leafletMap = null;
-  let googleMap = null;
+  const baseLayers = {};
 
   async function loadZones() {
     const response = await fetch('/api/v1/zones/');
@@ -63,104 +62,48 @@
   }
 
   async function renderLeaflet() {
-    mapBanner.textContent = 'Map provider: OpenStreetMap (free)';
+    const selectedStyle = (MAP_PROVIDER || 'carto-voyager').toLowerCase();
+    mapBanner.textContent = selectedStyle === 'carto-positron'
+      ? 'Map provider: CARTO Positron (free)'
+      : 'Map provider: CARTO Voyager (free)';
+
     leafletMap = L.map('map').setView([center.lat, center.lng], 3);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(leafletMap);
+    const voyagerLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      subdomains: 'abcd',
+      maxZoom: 20,
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+    });
+
+    const positronLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      subdomains: 'abcd',
+      maxZoom: 20,
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+    });
+
+    baseLayers['CARTO Voyager'] = voyagerLayer;
+    baseLayers['CARTO Positron'] = positronLayer;
+
+    const activeLayer = selectedStyle === 'carto-positron' ? positronLayer : voyagerLayer;
+    activeLayer.addTo(leafletMap);
+
+    L.control.layers(baseLayers, null, { collapsed: false, position: 'topright' }).addTo(leafletMap);
 
     const zones = await loadZones();
     zones.forEach((zone) => {
       L.geoJSON(zone.geometry, {
-        style: { color: 'red', fillOpacity: 0.3 }
+        style: { color: '#e11d48', fillColor: '#fb7185', fillOpacity: 0.28, weight: 2 }
       }).bindPopup(zone.name || 'Zone').addTo(leafletMap);
     });
 
     const route = await loadRoute();
     if (route && route.waypoints) {
       const coords = route.waypoints.map((w) => [w.coordinates[1], w.coordinates[0]]);
-      L.polyline(coords, { color: 'blue', weight: 3 }).addTo(leafletMap);
+      L.polyline(coords, { color: '#0f4c81', weight: 4, opacity: 0.95 }).addTo(leafletMap);
     }
-  }
-
-  async function renderGoogle() {
-    mapBanner.textContent = 'Map provider: Google Maps Satellite';
-    googleMap = new google.maps.Map(document.getElementById('map'), {
-      center,
-      zoom: 3,
-      mapTypeId: 'hybrid',
-      mapTypeControl: true,
-      fullscreenControl: true,
-      rotateControl: true,
-      streetViewControl: false,
-      gestureHandling: 'greedy',
-      tilt: 45,
-      heading: 0
-    });
-
-    google.maps.event.addListenerOnce(googleMap, 'idle', () => {
-      googleMap.setTilt(45);
-    });
-
-    const zones = await loadZones();
-    const dataLayer = new google.maps.Data({ map: googleMap });
-    zones.forEach((zone) => {
-      if (zone.geometry) {
-        dataLayer.addGeoJson({
-          type: 'Feature',
-          properties: { name: zone.name || 'Zone' },
-          geometry: zone.geometry
-        });
-      }
-    });
-    dataLayer.setStyle({
-      fillColor: '#ff0000',
-      fillOpacity: 0.25,
-      strokeColor: '#ff0000',
-      strokeWeight: 2
-    });
-
-    const route = await loadRoute();
-    if (route && route.waypoints) {
-      const path = route.waypoints.map((w) => ({ lat: w.coordinates[1], lng: w.coordinates[0] }));
-      new google.maps.Polyline({
-        path,
-        geodesic: true,
-        strokeColor: '#0057ff',
-        strokeOpacity: 1,
-        strokeWeight: 3,
-        map: googleMap
-      });
-    }
-  }
-
-  function loadGoogleScript() {
-    return new Promise((resolve, reject) => {
-      window.__onGoogleMapsReady = resolve;
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=weekly&callback=__onGoogleMapsReady`;
-      script.async = true;
-      script.defer = true;
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
   }
 
   async function init() {
-    const wantsGoogle = MAP_PROVIDER.toLowerCase() === 'google';
-    const hasGoogleKey = GOOGLE_MAPS_API_KEY && GOOGLE_MAPS_API_KEY !== '__GOOGLE_MAPS_API_KEY__';
-
-    if (wantsGoogle && hasGoogleKey) {
-      try {
-        await loadGoogleScript();
-        await renderGoogle();
-        return;
-      } catch (error) {
-        console.error('Google map failed, falling back to OSM:', error);
-      }
-    }
-
     await renderLeaflet();
   }
 
