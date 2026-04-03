@@ -139,7 +139,7 @@
     return new Promise((resolve, reject) => {
       window.__onGoogleMapsReady = resolve;
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=weekly&callback=__onGoogleMapsReady`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=weekly&language=en&region=US&callback=__onGoogleMapsReady`;
       script.async = true;
       script.defer = true;
       script.onerror = reject;

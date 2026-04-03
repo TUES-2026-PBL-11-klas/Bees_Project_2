@@ -2,15 +2,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi import HTTPException
-from fastapi.responses import HTMLResponse
-from api.router import router as api_router
-import traceback
+from fastapi.responses import HTMLResponse, RedirectResponse
+from src.api.router import router as api_router
 
 from src.infrastructure.database.database import init_db, close_db
-from src.api.routers.zones import router as zones_router
-from api.v1.routers.routes import router as routes_router
-from api.v1.routers.companies import router as companies_router
-from api.v1.routers.vessels import router as vessels_router
 from src.core.config import settings
 
 @asynccontextmanager
@@ -23,9 +18,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ClearWake Routing", lifespan=lifespan)
 
-app.include_router(zones_router)
 app.include_router(api_router)
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
+
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse(url="/docs")
 
 @app.get("/map", response_class=HTMLResponse)
 async def map_view():

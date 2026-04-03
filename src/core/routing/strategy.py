@@ -13,16 +13,27 @@ class FastestStrategy(RoutingStrategy):
         return graph.find_path(start_id, end_id)
 
 class EcoStrategy(RoutingStrategy):
-    def __init__(self):
-        self.spatial_service = ZoneSpatialService()
+    def __init__(self, spatial_service: Optional[ZoneSpatialService] = None):
+        self.spatial_service = spatial_service or ZoneSpatialService()
 
-    def calculate(self, request):
-        return {"route": "eco path", "request": request}
+    def _copy_graph(self, graph: NavigationGraph) -> NavigationGraph:
+        copied = NavigationGraph()
+
+        for waypoint in graph.get_all_waypoints():
+            copied.add_waypoint(waypoint)
+
+        for source_id, edges in graph._adjacency.items():
+            for edge in edges:
+                new_edge = copied.add_edge(source_id, edge.destination.node_id)
+                if edge.is_blocked:
+                    new_edge.block()
+
+        return copied
 
     def calculate_route(self, graph: NavigationGraph, start_id: str, end_id: str) -> Optional[List[Waypoint]]:
-        edges_to_unblock = []
+        eco_graph = self._copy_graph(graph)
 
-        for node_id, edges in graph._adjacency.items():
+        for node_id, edges in eco_graph._adjacency.items():
             for edge in edges:
                 if edge.is_blocked:
                     continue
@@ -34,11 +45,5 @@ class EcoStrategy(RoutingStrategy):
 
                 if self.spatial_service.is_route_blocked(route_segment):
                     edge.block()
-                    edges_to_unblock.append(edge)
 
-        path = graph.find_path(start_id, end_id)
-
-        for edge in edges_to_unblock:
-            edge.unblock()
-
-        return path
+        return eco_graph.find_path(start_id, end_id)

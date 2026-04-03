@@ -1,15 +1,57 @@
 from fastapi import APIRouter
-from core.services.routing_service import RoutingService
+from concurrent.futures import ThreadPoolExecutor
 
-router = APIRouter()
+from src.core.graph import NavigationGraph, Waypoint
+from src.core.routing.strategy import EcoStrategy, FastestStrategy
+from src.schemas.route import RouteCalculationSchema
+
+router = APIRouter(prefix="/api/v1/routing", tags=["routing"])
 
 
-class DummyStrategy:
-    def calculate(self, request):
-        return {"route": "calculated", "input": request}
+def get_initialized_graph() -> NavigationGraph:
+    g = NavigationGraph()
+    g.add_waypoint(Waypoint("MALTA", 35.9042, 14.5189))
+    g.add_waypoint(Waypoint("PIRAEUS", 37.9475, 23.6425))
+    g.add_waypoint(Waypoint("TRIPOLI", 32.8752, 13.1875))
+    g.add_edge("MALTA", "PIRAEUS")
+    g.add_edge("MALTA", "TRIPOLI")
+    g.add_edge("TRIPOLI", "PIRAEUS")
+    return g
 
 
-@router.post("/routes")
-def calculate_routes(requests: list):
-    service = RoutingService(strategy=DummyStrategy())
-    return service.calculate_routes_parallel(requests)
+executor = ThreadPoolExecutor(max_workers=5)
+
+
+@router.post("/calculate-parallel")
+def calculate_routes_parallel(requests: list[RouteCalculationSchema]):
+    graph = get_initialized_graph()
+
+    def calculate_single(request: RouteCalculationSchema):
+        if request.optimization_mode == "fastest":
+            strategy = FastestStrategy()
+        elif request.optimization_mode == "eco":
+            strategy = EcoStrategy()
+        else:
+            return {"error": "Invalid optimization mode"}
+
+        try:
+            path = strategy.calculate_route(graph, request.start_node_id, request.end_node_id)
+        except KeyError as error:
+            return {"error": str(error)}
+
+        if not path:
+            return {"error": "No route found"}
+
+        return {
+            "optimization_mode": request.optimization_mode,
+            "waypoints": [
+                {
+                    "sequence": idx,
+                    "coordinates": [wp.longitude, wp.latitude],
+                    "point_type": "waypoint",
+                }
+                for idx, wp in enumerate(path)
+            ],
+        }
+
+    return list(executor.map(calculate_single, requests))

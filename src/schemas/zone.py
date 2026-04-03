@@ -10,3 +10,14 @@ class ZoneCreateSchema(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ZoneUpdateSchema(BaseModel):
+    name: Optional[str] = None
+    zone_type: Optional[str] = None
+    status: Optional[str] = None
+    geometry: Optional[Dict[str, Any]] = None
+    description: Optional[str] = None
+
+    class Config:
+        from_attributes = True
