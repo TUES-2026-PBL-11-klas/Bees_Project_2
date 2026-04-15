@@ -44,7 +44,7 @@ def create_vessel(vessel_in: VesselCreateSchema):
         raise HTTPException(status_code=400, detail="Invalid company_id")
 
     payload["company_id"] = ObjectId(payload["company_id"])
-    vessel = VesselModel(**payload)
+    vessel = VesselModel.build(**payload)
     created = repo.create(vessel)
     return json.loads(created.to_json())
 
