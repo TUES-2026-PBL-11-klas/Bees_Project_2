@@ -4,12 +4,14 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import APIRouter, HTTPException, Query
 
+from src.core.services.vessel_status_service import VesselStatusService
 from src.infrastructure.repositories.vessel_repository import VesselRepository
 from src.models.vessel import Vessel as VesselModel
 from src.schemas.vessel import VesselCreateSchema, VesselUpdateSchema
 
 router = APIRouter(prefix="/api/v1/vessels", tags=["vessels"])
 repo = VesselRepository()
+status_service = VesselStatusService(repo)
 
 
 @router.get("/")
@@ -56,7 +58,7 @@ def update_vessel(vessel_id: str, vessel_in: VesselUpdateSchema):
             raise HTTPException(status_code=400, detail="Invalid company_id")
         payload["company_id"] = ObjectId(payload["company_id"])
 
-    updated = repo.update(vessel_id, payload)
+    updated = status_service.update_vessel(vessel_id, payload)
     if not updated:
         raise HTTPException(status_code=404, detail="Vessel not found")
     return json.loads(updated.to_json())
