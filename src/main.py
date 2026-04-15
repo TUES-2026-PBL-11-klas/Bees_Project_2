@@ -4,9 +4,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from src.api.router import router as api_router
-
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from src.api.errors import APIError
+from src.core.logging_config import logger
 from src.infrastructure.database.database import init_db, close_db
 from src.core.config import settings
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -45,3 +49,42 @@ async def map_view():
             status_code=500,
             detail=f"Server error while reading: {str(e)}"
         )
+@app.exception_handler(APIError)
+async def api_error_handler(request: Request, exc: APIError):
+    logger.error(f"API Error: {exc.message} - {exc.details}")
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "message": exc.message,
+                "details": exc.details
+            }
+        }
+    )
+@app.exception_handler(APIError)
+async def api_error_handler(request: Request, exc: APIError):
+    logger.error(f"API Error: {exc.message} - {exc.details}")
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "message": exc.message,
+                "details": exc.details
+            }
+        }
+    )
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception(f"Unhandled error: {str(exc)}")
+
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "message": "Internal Server Error",
+                "details": str(exc)
+            }
+        }
+    )
