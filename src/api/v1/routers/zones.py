@@ -10,6 +10,33 @@ router = APIRouter(prefix="/api/v1/zones", tags=["zones"])
 repo = ZoneRepository()
 
 
+def _normalize_lon(lon: float) -> float:
+    while lon > 180:
+        lon -= 360
+    while lon < -180:
+        lon += 360
+    return lon
+
+
+def _normalize_geometry_coordinates(coordinates):
+    if not isinstance(coordinates, list):
+        return coordinates
+
+    if coordinates and isinstance(coordinates[0], (int, float)) and len(coordinates) >= 2:
+        return [_normalize_lon(float(coordinates[0])), float(coordinates[1])]
+
+    return [_normalize_geometry_coordinates(item) for item in coordinates]
+
+
+def _normalize_geometry(geometry: dict | None):
+    if not geometry or "coordinates" not in geometry:
+        return geometry
+
+    normalized = dict(geometry)
+    normalized["coordinates"] = _normalize_geometry_coordinates(geometry["coordinates"])
+    return normalized
+
+
 @router.get("/")
 def get_zones(status: str | None = Query(default=None), zone_type: str | None = Query(default=None)):
     if status == "active":
@@ -32,14 +59,19 @@ def get_zone_by_id(zone_id: str):
 
 @router.post("/")
 def create_zone(zone_in: ZoneCreateSchema):
-    zone = ZoneModel(**zone_in.model_dump(exclude_unset=True))
+    payload = zone_in.model_dump(exclude_unset=True)
+    payload["geometry"] = _normalize_geometry(payload.get("geometry"))
+    zone = ZoneModel(**payload)
     created = repo.create(zone)
     return json.loads(created.to_json())
 
 
 @router.patch("/{zone_id}")
 def update_zone(zone_id: str, zone_in: ZoneUpdateSchema):
-    updated = repo.update(zone_id, zone_in.model_dump(exclude_unset=True))
+    payload = zone_in.model_dump(exclude_unset=True)
+    if "geometry" in payload:
+        payload["geometry"] = _normalize_geometry(payload.get("geometry"))
+    updated = repo.update(zone_id, payload)
     if not updated:
         raise HTTPException(status_code=404, detail="Zone not found")
     return json.loads(updated.to_json())

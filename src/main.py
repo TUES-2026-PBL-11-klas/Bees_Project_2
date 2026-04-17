@@ -1,30 +1,28 @@
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi import HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
-from src.api.router import router as api_router
-from fastapi import Request
-from fastapi.responses import JSONResponse
-from src.api.errors import APIError
-from src.core.logging_config import logger
-from src.infrastructure.database.database import init_db, close_db
-from src.core.config import settings
 
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+
+from src.api.errors import APIError
+from src.api.router import router as api_router
+from src.core.config import settings
+from src.infrastructure.database.database import close_db, init_db
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=settings.LOG_LEVEL.upper())
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-
     yield
-
     close_db()
 
 app = FastAPI(title="ClearWake Routing", lifespan=lifespan)
 
 app.include_router(api_router)
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
-
 
 @app.get("/", include_in_schema=False)
 async def root():
@@ -49,6 +47,7 @@ async def map_view():
             status_code=500,
             detail=f"Server error while reading: {str(e)}"
         )
+
 @app.exception_handler(APIError)
 async def api_error_handler(request: Request, exc: APIError):
     logger.error(f"API Error: {exc.message} - {exc.details}")
@@ -62,19 +61,7 @@ async def api_error_handler(request: Request, exc: APIError):
             }
         }
     )
-@app.exception_handler(APIError)
-async def api_error_handler(request: Request, exc: APIError):
-    logger.error(f"API Error: {exc.message} - {exc.details}")
 
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "error": {
-                "message": exc.message,
-                "details": exc.details
-            }
-        }
-    )
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.exception(f"Unhandled error: {str(exc)}")
