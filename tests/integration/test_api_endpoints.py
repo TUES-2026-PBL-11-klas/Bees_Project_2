@@ -10,7 +10,8 @@ def client():
     with patch("src.infrastructure.database.database.mongoengine.connect") as mock_connect, \
          patch("src.infrastructure.database.database.mongoengine.disconnect"):
         import mongoengine
-        mongoengine.connect("testdb", host="mongomock://localhost")
+        import mongomock
+        mongoengine.connect("testdb", host="mongodb://localhost", mongo_client_class=mongomock.MongoClient)
         with TestClient(app) as test_client:
             yield test_client
         mongoengine.disconnect()
