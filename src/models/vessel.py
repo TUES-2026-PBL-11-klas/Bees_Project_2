@@ -3,6 +3,40 @@ from datetime import datetime
 from typing import Type
 
 
+VESSEL_TYPES: tuple[str, ...] = (
+    "tanker",
+    "container_ship",
+    "bulk_carrier",
+    "passenger_ship",
+    "ferry",
+    "ro_ro_ship",
+    "lng_carrier",
+    "lpg_carrier",
+    "chemical_tanker",
+    "car_carrier",
+    "general_cargo",
+    "offshore_support",
+    "research_vessel",
+    "icebreaker",
+    "tugboat",
+    "fishing_vessel",
+    "cruise_ship",
+    "yacht",
+    "patrol_boat",
+    "dredger",
+)
+
+
+def format_vessel_type_label(vessel_type: str) -> str:
+    return vessel_type.replace("_", " ").title()
+
+
+VESSEL_TYPE_OPTIONS = [
+    {"value": vessel_type, "label": format_vessel_type_label(vessel_type)}
+    for vessel_type in VESSEL_TYPES
+]
+
+
 class VesselSpecs(me.EmbeddedDocument):
     max_draft_m = me.FloatField()
     max_speed_knots = me.FloatField()
@@ -14,28 +48,7 @@ class Vessel(me.Document):
     company_id = me.ObjectIdField(required=True)
     name = me.StringField(required=True)
     imo_number = me.StringField(required=True, unique=True)
-    vessel_type = me.StringField(choices=[
-        "tanker",
-        "container_ship",
-        "bulk_carrier",
-        "passenger_ship",
-        "ferry",
-        "ro_ro_ship",
-        "lng_carrier",
-        "lpg_carrier",
-        "chemical_tanker",
-        "car_carrier",
-        "general_cargo",
-        "offshore_support",
-        "research_vessel",
-        "icebreaker",
-        "tugboat",
-        "fishing_vessel",
-        "cruise_ship",
-        "yacht",
-        "patrol_boat",
-        "dredger",
-    ])
+    vessel_type = me.StringField(choices=VESSEL_TYPES)
     specs = me.EmbeddedDocumentField(VesselSpecs)
     fuel_consumption_rate = me.FloatField()
     current_status = me.StringField(choices=["idle", "en_route", "docked"], default="idle")
