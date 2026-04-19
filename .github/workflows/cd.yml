@@ -27,16 +27,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set lowercase owner and repository
+        run: |
+          echo "OWNER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "REPOSITORY=$(echo ${{ github.event.repository.name }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/clearwake-api:${{ github.sha }}
+          tags: ghcr.io/${{ env.OWNER }}/${{ env.REPOSITORY }}:${{ github.sha }}
 
       - name: Update Kubernetes Deployment with new image tag
         run: |
-          sed -i 's|image: clearwake/api:.*|image: ghcr.io/${{ github.repository_owner }}/clearwake-api:${{ github.sha }}|g' deploy/kubernetes/deployment.yaml
+          sed -i "s|^\(\s*image:\s*\).*|\1ghcr.io/${{ env.OWNER }}/${{ env.REPOSITORY }}:${{ github.sha }}|g" deploy/kubernetes/deployment.yaml
 
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
