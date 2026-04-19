@@ -34,6 +34,10 @@ jobs:
       - name: Send webhook notification
         if: always()
         run: |
-          curl -X POST -H "Content-Type: application/json" \
-          -d '{"text": "CI Pipeline finished. Status: ${{ job.status }}"}' \
-          ${{ secrets.WEBHOOK_URL }} || echo "Webhook notification skipped or failed"
+          if [ -n "${{ secrets.WEBHOOK_URL }}" ]; then
+            curl -X POST -H "Content-Type: application/json" \
+            -d '{"text": "CI Pipeline finished. Status: ${{ job.status }}"}' \
+            ${{ secrets.WEBHOOK_URL }}
+          else
+            echo "WEBHOOK_URL secret is not set, skipping notification."
+          fi
