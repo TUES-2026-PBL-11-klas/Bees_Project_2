@@ -267,6 +267,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--ocea
 const MAP_PROVIDER = "__MAP_PROVIDER__";
 const DEMO_COMPANY_ID = '000000000000000000000001';
 let map, zonesLayer, routeLayer, vesselsLayer;
+let landMaskLayer = null, lakeMaskLayer = null;
 let currentStrategy = 'fastest';
 let zonesData = [], vesselsData = [];
 let zonesVisible = true, vesselsVisible = false;
@@ -372,6 +373,49 @@ async function ensureLandGeometriesLoaded() {
   return landGeometries.length > 0;
 }
 
+function landMaskStyleFor(layerName) {
+  if (layerName === 'Dark Ocean') {
+    return {
+      fillColor: '#1e293b',
+      fillOpacity: 0.92,
+      color: '#334155',
+      weight: 0.8,
+      opacity: 0.85,
+    };
+  }
+  return {
+    fillColor: '#000000',
+    fillOpacity: 0,
+    color: '#000000',
+    weight: 0,
+    opacity: 0,
+  };
+}
+
+function lakeMaskStyleFor(layerName) {
+  if (layerName === 'Dark Ocean') {
+    return {
+      fillColor: '#07111f',
+      fillOpacity: 0.95,
+      stroke: false,
+    };
+  }
+  return {
+    fillColor: '#000000',
+    fillOpacity: 0,
+    stroke: false,
+  };
+}
+
+function applyMaskStyle(layerName) {
+  if (landMaskLayer) {
+    landMaskLayer.setStyle(landMaskStyleFor(layerName));
+  }
+  if (lakeMaskLayer) {
+    lakeMaskLayer.setStyle(lakeMaskStyleFor(layerName));
+  }
+}
+
 async function initMap() {
   map = L.map('map', {
     center: [20, 30], zoom: 3, minZoom: 2, maxZoom: 18,
@@ -440,6 +484,7 @@ async function initMap() {
   L.control.layers(baseLayers, null, { collapsed:true, position:'topright' }).addTo(map);
   map.on('baselayerchange', e => {
     updateLabelsLayer(e.name);
+    applyMaskStyle(e.name);
   });
 
   setStatus('Loading geography...');
@@ -453,12 +498,23 @@ async function initMap() {
       if (geom) geom.bbox = turf.bbox(geom);
       return geom;
     }).filter(Boolean);
-    L.geoJSON(land, { pane:'landPane', style:{ fillColor:'#1e293b', fillOpacity:1, color:'#334155', weight:0.8, opacity:0.9 }, interactive:false }).addTo(map);
+    landMaskLayer = L.geoJSON(land, {
+      pane:'landPane',
+      style: landMaskStyleFor(preferredBaseLayerName),
+      interactive:false,
+    }).addTo(map);
   }
   if (!landGeometries.length) {
     notify('Land mask failed to load. Sea-safe routing is unavailable.', 'err');
   }
-  if (lakes) L.geoJSON(lakes, { pane:'lakePane', style:{ fillColor:'#07111f', fillOpacity:1, stroke:false }, interactive:false }).addTo(map);
+  if (lakes) {
+    lakeMaskLayer = L.geoJSON(lakes, {
+      pane:'lakePane',
+      style: lakeMaskStyleFor(preferredBaseLayerName),
+      interactive:false,
+    }).addTo(map);
+  }
+  applyMaskStyle(preferredBaseLayerName);
 
   zonesLayer = L.featureGroup().addTo(map);
   routeLayer = L.featureGroup().addTo(map);
