@@ -10,8 +10,30 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
       - uses: pre-commit/action@v3.0.1
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run tests
+        run: |
+          pytest tests/ --cov=src --cov-fail-under=50
+      - name: Send webhook notification
+        if: always()
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+          -d '{"text": "CI Pipeline finished. Status: ${{ job.status }}"}' \
+          ${{ secrets.WEBHOOK_URL }} || echo "Webhook notification skipped or failed"

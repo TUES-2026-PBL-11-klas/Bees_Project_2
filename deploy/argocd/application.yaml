@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: clearwake-routing-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/YOUR_GITHUB_ORG/Bees_Project_2.git' # TODO: Replace with actual repo URL
+    targetRevision: HEAD
+    path: deploy/kubernetes
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: clearwake-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

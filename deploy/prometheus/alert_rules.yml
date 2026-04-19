@@ -1,0 +1,20 @@
+groups:
+  - name: clearwake_alerts
+    rules:
+      - alert: APIHighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API High Error Rate"
+          description: "Over 5% of API requests are failing with 5xx errors."
+
+      - alert: APIInstanceDown
+        expr: up{job="clearwake-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API Instance is down"
+          description: "Prometheus cannot scrape metrics from the API."

@@ -4,12 +4,14 @@ variable "aws_region" {
   default     = "eu-central-1"
 }
 
-variable "eks_role_arn" {
-  description = "IAM role for EKS cluster"
+variable "environment" {
+  description = "Deployment environment (e.g. dev, prod)"
   type        = string
+  default     = "dev"
 }
 
-variable "subnet_ids" {
-  description = "Subnets for EKS cluster"
-  type        = list(string)
+variable "mongodb_uri" {
+  description = "MongoDB Connection URI to store in AWS Secrets Manager"
+  type        = string
+  sensitive   = true
 }

@@ -9,6 +9,7 @@ from src.models.vessel import (
     Dredger,
     Ferry,
     FishingVessel,
+    GeneralCargo,
     Icebreaker,
     LNGCarrier,
     LPGCarrier,
