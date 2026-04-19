@@ -50,6 +50,21 @@ docker-compose up --build -d
 
 API will be available at http://localhost:8080/docs
 
+### Initialize Database (MongoDB)
+Run the bootstrap script once to create indexes and seed demo records:
+
+```bash
+python -m src.infrastructure.database.bootstrap
+```
+
+If you are running with Docker Compose, execute it inside the app container:
+
+```bash
+docker-compose exec app python -m src.infrastructure.database.bootstrap
+```
+
+The script is idempotent and can be re-run safely.
+
 7. Open the API docs
 http://localhost:8080/docs
 
