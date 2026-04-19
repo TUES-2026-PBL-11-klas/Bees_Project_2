@@ -1911,11 +1911,13 @@ async function ensureRouteOverWater(route, vesselId) {
   const hasLandMask = await ensureLandGeometriesLoaded();
   if (!hasLandMask) {
     console.warn('Land mask unavailable — graph route displayed as-is');
-    return;
+    return false;
   }
 
   const wps = (route.waypoints || []).sort((a, b) => a.sequence - b.sequence);
-  if (wps.length < 2) return;
+  if (wps.length < 2) return false;
+
+  const originalWaypoints = JSON.parse(JSON.stringify(route.waypoints || []));
 
   const vessel = getVesselById(vesselId);
   const routePoints = wps
@@ -2005,8 +2007,12 @@ async function ensureRouteOverWater(route, vesselId) {
   });
 
   if (routePayloadIntersectsLand(route)) {
-    throw new Error('Graph refinement still intersects land.');
+    console.warn('Refined route still intersects land; falling back to backend graph route.');
+    route.waypoints = originalWaypoints;
+    return false;
   }
+
+  return true;
 }
 
 async function calculateRoute() {
@@ -2020,27 +2026,31 @@ async function calculateRoute() {
   try {
     currentRouteRequest = { start, end, vessel };
     let route;
-    // Try the backend graph API first — it handles port name resolution
-    // and vessel constraints (draft, beam, length at straits/canals).
+    let graphMode = false;
+
     try {
       route = await calculateApiGraphRoute(start, end, vessel);
       route.route_mode = 'graph';
+      graphMode = true;
       await ensureRouteOverWater(route, vessel);
-      if (routePayloadIntersectsLand(route)) {
-        throw new Error('Graph route intersects land after refinement.');
-      }
     } catch (graphErr) {
       console.log('Graph route failed, trying geodesic:', graphErr.message);
+
       route = await calculateGeodesicRoute(start, end, vessel);
-      if (routePayloadIntersectsLand(route)) {
+      if (!graphMode && routePayloadIntersectsLand(route)) {
         throw new Error('No water-only route found between these ports.');
       }
     }
 
     displayRoute(route);
     notify(`Route calculated — ${route.waypoints?.length||0} points ✓`);
-  } catch(e) { notify(e.message||'Calculation failed','err'); }
-  finally { btn.disabled=false; btn.innerHTML='Calculate Route'; setLoading(false); }
+  } catch(e) {
+    notify(e.message||'Calculation failed','err');
+  } finally {
+    btn.disabled=false;
+    btn.innerHTML='Calculate Route';
+    setLoading(false);
+  }
 }
 
 async function refreshCurrentRouteIfNeeded() {
@@ -2056,6 +2066,9 @@ async function refreshCurrentRouteIfNeeded() {
       await ensureRouteOverWater(route, vessel);
     } else {
       route = await calculateGeodesicRoute(start, end, vessel);
+      if (routePayloadIntersectsLand(route)) {
+        return;
+      }
     }
 
     displayRoute(route);
