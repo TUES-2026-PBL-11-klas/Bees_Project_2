@@ -1,10 +1,12 @@
 import json
 import logging
 from typing import Optional
+from pathlib import Path
 
 from bson import ObjectId
 from fastapi import APIRouter, HTTPException
 from concurrent.futures import ThreadPoolExecutor
+from fastapi.responses import FileResponse
 
 from src.schemas.route import RouteCalculationSchema
 from src.core.routing.strategy import (
@@ -51,6 +53,7 @@ _FUEL_MULTIPLIERS: dict[str, float] = {
 
 
 _GRAPH = build_navigation_graph()
+_LAND_MASK_PATH = Path(__file__).resolve().parents[4] / "ne_50m_land.geojson"
 
 
 
@@ -162,6 +165,17 @@ def get_available_ports():
         {"port_id": p.port_id, "name": p.name, "lat": p.latitude, "lon": p.longitude}
         for p in ports
     ]
+
+
+@router.get("/landmask")
+def get_landmask_geojson():
+    if not _LAND_MASK_PATH.exists():
+        raise HTTPException(status_code=404, detail="Land mask file is missing")
+    return FileResponse(
+        _LAND_MASK_PATH,
+        media_type="application/geo+json",
+        filename="ne_50m_land.geojson",
+    )
 
 
 @router.post("/calculate")

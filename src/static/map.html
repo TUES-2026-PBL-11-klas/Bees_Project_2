@@ -331,6 +331,8 @@ const zoneColors = {
 };
 
 const LAND_GEOJSON_SOURCES = [
+  '/api/v1/routes/landmask',
+  '/static/ne_50m_land.geojson',
   'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_land.geojson',
   'https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_land.geojson',
 ];
@@ -1894,13 +1896,24 @@ async function ensureRouteOverWater(route, vesselId) {
   if (wps.length < 2) return;
 
   const vessel = getVesselById(vesselId);
+  const routePoints = wps
+    .map((wp) => ({ lat: wp.coordinates?.[1], lon: wp.coordinates?.[0] }))
+    .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon));
+
+  const navigablePoints = routePoints.map((point, idx) => {
+    const toward = routePoints[idx + 1] || routePoints[idx - 1] || null;
+    return findNearestWaterPoint(
+      { lat: point.lat, lon: normalizeLon(point.lon) },
+      toward ? { lat: toward.lat, lon: normalizeLon(toward.lon) } : null,
+    );
+  });
+
   const allRefinedPoints = [];
 
-  for (let i = 0; i < wps.length - 1; i++) {
-    const p1 = { lat: wps[i].coordinates[1], lon: wps[i].coordinates[0] };
-    const p2 = { lat: wps[i + 1].coordinates[1], lon: wps[i + 1].coordinates[0] };
+  for (let i = 0; i < navigablePoints.length - 1; i++) {
+    const p1 = navigablePoints[i];
+    const p2 = navigablePoints[i + 1];
 
-    // Quick check — if the leg is already over water, just smooth it.
     let legCrossesLand = false;
     try { legCrossesLand = segmentIntersectsLand(p1, p2); } catch { /* safe */ }
 
@@ -1910,16 +1923,13 @@ async function ensureRouteOverWater(route, vesselId) {
       continue;
     }
 
-    // ── Leg crosses land — build a water-only waypoint chain ──────────
     let legWaypoints;
     try {
       legWaypoints = buildZoneAwareWaypoints(p1, p2, currentStrategy, vessel);
     } catch {
-      // Zone-aware system couldn't handle it — use recursive subdivision
       legWaypoints = subdivideAroundLand(p1, p2, 0);
     }
 
-    // Safety net: run subdivision over every sub-leg that still crosses land
     const safeLeg = [legWaypoints[0]];
     for (let j = 1; j < legWaypoints.length; j++) {
       const subA = safeLeg[safeLeg.length - 1];
@@ -1943,19 +1953,38 @@ async function ensureRouteOverWater(route, vesselId) {
     point_type: 'waypoint',
   }));
 
-  // Restore metadata (port names, types) from the original waypoints
+  const nearestRoutePointIndex = (target) => {
+    let bestIdx = -1;
+    let bestDistanceKm = Infinity;
+
+    route.waypoints.forEach((wp, idx) => {
+      const point = { lat: wp.coordinates[1], lon: wp.coordinates[0] };
+      const d = haversineKm(target, point);
+      if (d < bestDistanceKm) {
+        bestDistanceKm = d;
+        bestIdx = idx;
+      }
+    });
+
+    return bestDistanceKm <= 200 ? bestIdx : -1;
+  };
+
   wps.forEach(originalWp => {
     if (originalWp.point_type === 'port' || originalWp.name) {
-      const matchIdx = route.waypoints.findIndex(nw =>
-        Math.abs(nw.coordinates[0] - originalWp.coordinates[0]) < 0.01 &&
-        Math.abs(nw.coordinates[1] - originalWp.coordinates[1]) < 0.01
-      );
+      const matchIdx = nearestRoutePointIndex({
+        lat: originalWp.coordinates[1],
+        lon: originalWp.coordinates[0],
+      });
       if (matchIdx !== -1) {
         route.waypoints[matchIdx].point_type = originalWp.point_type;
         route.waypoints[matchIdx].name = originalWp.name;
       }
     }
   });
+
+  if (routePayloadIntersectsLand(route)) {
+    throw new Error('Graph refinement still intersects land.');
+  }
 }
 
 async function calculateRoute() {
@@ -1974,12 +2003,16 @@ async function calculateRoute() {
     try {
       route = await calculateApiGraphRoute(start, end, vessel);
       route.route_mode = 'graph';
-      // Re-route every leg through water using the land-avoidance system
       await ensureRouteOverWater(route, vessel);
+      if (routePayloadIntersectsLand(route)) {
+        throw new Error('Graph route intersects land after refinement.');
+      }
     } catch (graphErr) {
-      // Backend doesn't know this port — fall back to geodesic
       console.log('Graph route failed, trying geodesic:', graphErr.message);
       route = await calculateGeodesicRoute(start, end, vessel);
+      if (routePayloadIntersectsLand(route)) {
+        throw new Error('No water-only route found between these ports.');
+      }
     }
 
     displayRoute(route);
