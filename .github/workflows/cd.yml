@@ -46,3 +46,4 @@ jobs:
           git add deploy/kubernetes/deployment.yaml
           git commit -m "Update image tag to ${{ github.sha }} [skip ci]" || echo "No changes to commit"
           git push
+          
