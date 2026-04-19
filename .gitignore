@@ -225,3 +225,6 @@ logs/
 
 # Alembic
 alembic/versions/*.pyc
+
+# Node dependencies
+node_modules/

@@ -9,6 +9,7 @@ from src.api.errors import APIError
 from src.api.router import router as api_router
 from src.core.config import settings
 from src.infrastructure.database.database import close_db, init_db
+from prometheus_fastapi_instrumentator import Instrumentator
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=settings.LOG_LEVEL.upper())
@@ -23,6 +24,8 @@ app = FastAPI(title="ClearWake Routing", lifespan=lifespan)
 
 app.include_router(api_router)
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
+
+Instrumentator().instrument(app).expose(app)
 
 @app.get("/", include_in_schema=False)
 async def root():

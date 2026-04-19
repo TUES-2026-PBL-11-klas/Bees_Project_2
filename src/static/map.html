@@ -364,7 +364,11 @@ async function ensureLandGeometriesLoaded() {
     return false;
   }
 
-  landGeometries = (land.features || []).map((feature) => feature.geometry).filter(Boolean);
+  landGeometries = (land.features || []).map((feature) => {
+    const geom = feature.geometry;
+    if (geom) geom.bbox = turf.bbox(geom);
+    return geom;
+  }).filter(Boolean);
   return landGeometries.length > 0;
 }
 
@@ -403,7 +407,11 @@ async function initMap() {
     loadFirstAvailableJson(LAKES_GEOJSON_SOURCES),
   ]);
   if (land) {
-    landGeometries = (land.features || []).map(feature => feature.geometry).filter(Boolean);
+    landGeometries = (land.features || []).map(feature => {
+      const geom = feature.geometry;
+      if (geom) geom.bbox = turf.bbox(geom);
+      return geom;
+    }).filter(Boolean);
     L.geoJSON(land, { pane:'landPane', style:{ fillColor:'#1e293b', fillOpacity:1, color:'#334155', weight:0.8, opacity:0.9 }, interactive:false }).addTo(map);
   }
   if (!landGeometries.length) {
@@ -1150,12 +1158,13 @@ function segmentIntersectsLand(start, end) {
         return false;
       }
 
-      const line = turf.lineString(trimmed);
+      // Normalize line to [-180, 180]
+      const normalizedTrimmed = trimmed.map(pt => [normalizeLon(pt[0]), pt[1]]);
+      const line = turf.lineString(normalizedTrimmed);
       const [lineMinLon, lineMinLat, lineMaxLon, lineMaxLat] = turf.bbox(line);
 
       for (const landGeometry of landGeometries) {
-        const wrappedLand = wrapGeometryLongitudes(landGeometry, referenceLon);
-        const [landMinLon, landMinLat, landMaxLon, landMaxLat] = turf.bbox(wrappedLand);
+        const [landMinLon, landMinLat, landMaxLon, landMaxLat] = landGeometry.bbox;
 
         const disjoint = (
           landMaxLon < lineMinLon ||
@@ -1164,11 +1173,9 @@ function segmentIntersectsLand(start, end) {
           landMinLat > lineMaxLat
         );
 
-        if (disjoint) {
-          continue;
-        }
+        if (disjoint) continue;
 
-        if (turf.booleanIntersects(line, wrappedLand)) {
+        if (turf.booleanIntersects(line, landGeometry)) {
           return true;
         }
       }
@@ -1185,12 +1192,14 @@ function pointIsOnLand(point) {
   if (!landGeometries.length || typeof turf === 'undefined') return false;
 
   try {
-    const referenceLon = normalizeLon(point.lon);
-    const turfPoint = turf.point([referenceLon, point.lat]);
+    const normalizedLon = normalizeLon(point.lon);
+    const turfPoint = turf.point([normalizedLon, point.lat]);
 
     for (const landGeometry of landGeometries) {
-      const wrappedLand = wrapGeometryLongitudes(landGeometry, referenceLon);
-      if (turf.booleanPointInPolygon(turfPoint, wrappedLand)) {
+      const [landMinLon, landMinLat, landMaxLon, landMaxLat] = landGeometry.bbox;
+      if (normalizedLon < landMinLon || normalizedLon > landMaxLon || point.lat < landMinLat || point.lat > landMaxLat) continue;
+
+      if (turf.booleanPointInPolygon(turfPoint, landGeometry)) {
         return true;
       }
     }
@@ -1661,13 +1670,28 @@ async function calculateGeodesicRoute(startText, endText, vesselId = '') {
   }
 
   const vessel = getVesselById(vesselId);
-  const routeWaypoints = buildZoneAwareWaypoints(startPoint, endPoint, currentStrategy, vessel);
-
-  if (routeHasBlockedLeg(routeWaypoints)) {
-    throw new Error('Route intersects land. Try nearby ports or different strategy.');
+  let routeWaypoints;
+  try {
+    routeWaypoints = buildZoneAwareWaypoints(startPoint, endPoint, currentStrategy, vessel);
+  } catch {
+    // Zone-aware routing failed — fall back to recursive subdivision
+    routeWaypoints = subdivideAroundLand(startPoint, endPoint, 0);
   }
 
-  const geodesicPath = buildGeodesicPath(routeWaypoints);
+  // Safety net: subdivide any remaining land-crossing sub-legs
+  const safeWaypoints = [routeWaypoints[0]];
+  for (let i = 1; i < routeWaypoints.length; i++) {
+    const a = safeWaypoints[safeWaypoints.length - 1];
+    const b = routeWaypoints[i];
+    if (segmentIntersectsLand(a, b)) {
+      const fixed = subdivideAroundLand(a, b, 0);
+      safeWaypoints.push(...fixed.slice(1));
+    } else {
+      safeWaypoints.push(b);
+    }
+  }
+
+  const geodesicPath = buildGeodesicPath(safeWaypoints);
   const waypoints = geodesicPath.map((p, idx) => ({
     sequence: idx,
     coordinates: [p.lon, p.lat],
@@ -1680,7 +1704,7 @@ async function calculateGeodesicRoute(startText, endText, vesselId = '') {
     route_mode: 'geodesic',
     from_label: start.name,
     to_label: end.name,
-    logical_waypoints: routeWaypoints.length,
+    logical_waypoints: safeWaypoints.length,
   };
 }
 
@@ -1707,14 +1731,60 @@ function splitRouteSegments(coords) {
 }
 
 /**
- * Takes a graph-based route (sequence of port/waypoint coordinates from the backend)
- * and re-routes each leg through the frontend's water-avoidance system so the
- * final rendered path stays 100% over water.
+ * Recursively subdivides a leg that crosses land until every sub-segment
+ * stays over water. At each level, the midpoint of the blocked segment is
+ * computed on the great circle and, if it falls on land, pushed to the
+ * nearest water point (perpendicular to the leg direction first, then
+ * radial search). The two resulting sub-legs are then checked recursively.
  *
- * The backend graph determines WHICH waypoints to pass through (and applies
- * vessel constraints like draft at the Bosphorus or Suez).  This function
- * then determines HOW to draw the path between those waypoints without
- * crossing any land.
+ * Max depth of 8 gives up to 256 sub-segments — fine-grained enough to
+ * trace any coastline.
+ */
+function subdivideAroundLand(a, b, depth) {
+  const MAX_DEPTH = 8;
+  if (depth >= MAX_DEPTH) return [a, b];
+  if (!segmentIntersectsLand(a, b)) return [a, b];
+
+  // Find the midpoint on the great circle
+  const mid = interpolateGreatCircle(a, b, 0.5);
+  let waterMid = { lat: mid.lat, lon: normalizeLon(mid.lon) };
+
+  if (pointIsOnLand(waterMid)) {
+    // Push perpendicular to the leg direction first (faster than radial)
+    const legBearing = bearingBetween(a, b);
+    const perpR = (legBearing + 90) % 360;
+    const perpL = (legBearing + 270) % 360;
+    let found = false;
+
+    for (let km = 5; km <= 250; km += 5) {
+      const cR = offsetPointByKm(waterMid, perpR, km);
+      if (!pointIsOnLand(cR)) { waterMid = cR; found = true; break; }
+      const cL = offsetPointByKm(waterMid, perpL, km);
+      if (!pointIsOnLand(cL)) { waterMid = cL; found = true; break; }
+    }
+
+    // Fallback: full radial search biased toward destination
+    if (!found) {
+      waterMid = findNearestWaterPoint(mid, b);
+    }
+  }
+
+  const firstHalf  = subdivideAroundLand(a, waterMid, depth + 1);
+  const secondHalf = subdivideAroundLand(waterMid, b, depth + 1);
+  return [...firstHalf, ...secondHalf.slice(1)];
+}
+
+/**
+ * Takes a graph-based route (sequence of port/waypoint coordinates from the
+ * backend) and re-routes each leg through the frontend's water-avoidance
+ * system so the final rendered path stays 100 % over water.
+ *
+ * Strategy:
+ *   1. Try the full zone-aware detour system (handles zones + land).
+ *   2. If that throws, fall back to recursive subdivision which handles
+ *      any size of land mass reliably.
+ *   3. As a final safety net, run subdivision over every sub-leg produced
+ *      by step 1/2 to catch any remaining land crossings.
  */
 async function ensureRouteOverWater(route, vesselId) {
   const hasLandMask = await ensureLandGeometriesLoaded();
@@ -1733,45 +1803,40 @@ async function ensureRouteOverWater(route, vesselId) {
     const p1 = { lat: wps[i].coordinates[1], lon: wps[i].coordinates[0] };
     const p2 = { lat: wps[i + 1].coordinates[1], lon: wps[i + 1].coordinates[0] };
 
-    // First check: does this leg actually cross land?
-    // If not, just create a smooth great-circle arc — no detour needed.
+    // Quick check — if the leg is already over water, just smooth it.
     let legCrossesLand = false;
-    try {
-      legCrossesLand = routeHasBlockedLeg([p1, p2]);
-    } catch(e) {
-      legCrossesLand = false;
-    }
+    try { legCrossesLand = segmentIntersectsLand(p1, p2); } catch { /* safe */ }
 
     if (!legCrossesLand) {
-      // Leg is over water — just smooth it with a great-circle arc
       const legPath = buildGeodesicPath([p1, p2]);
-      if (i === 0) {
-        allRefinedPoints.push(...legPath);
-      } else {
-        allRefinedPoints.push(...legPath.slice(1));
-      }
+      allRefinedPoints.push(...(i === 0 ? legPath : legPath.slice(1)));
       continue;
     }
 
-    // Leg crosses land — use the full detour system
+    // ── Leg crosses land — build a water-only waypoint chain ──────────
+    let legWaypoints;
     try {
-      const legWaypoints = buildZoneAwareWaypoints(p1, p2, currentStrategy, vessel);
-      const legPath = buildGeodesicPath(legWaypoints);
-      if (i === 0) {
-        allRefinedPoints.push(...legPath);
+      legWaypoints = buildZoneAwareWaypoints(p1, p2, currentStrategy, vessel);
+    } catch {
+      // Zone-aware system couldn't handle it — use recursive subdivision
+      legWaypoints = subdivideAroundLand(p1, p2, 0);
+    }
+
+    // Safety net: run subdivision over every sub-leg that still crosses land
+    const safeLeg = [legWaypoints[0]];
+    for (let j = 1; j < legWaypoints.length; j++) {
+      const subA = safeLeg[safeLeg.length - 1];
+      const subB = legWaypoints[j];
+      if (segmentIntersectsLand(subA, subB)) {
+        const fixed = subdivideAroundLand(subA, subB, 0);
+        safeLeg.push(...fixed.slice(1));
       } else {
-        allRefinedPoints.push(...legPath.slice(1));
-      }
-    } catch (err) {
-      console.warn(`Leg ${i} water-refinement failed: ${err.message}; using smooth arc`);
-      // Fall back to smooth great-circle arc for this leg
-      const legPath = buildGeodesicPath([p1, p2]);
-      if (i === 0) {
-        allRefinedPoints.push(...legPath);
-      } else {
-        allRefinedPoints.push(...legPath.slice(1));
+        safeLeg.push(subB);
       }
     }
+
+    const legPath = buildGeodesicPath(safeLeg);
+    allRefinedPoints.push(...(i === 0 ? legPath : legPath.slice(1)));
   }
 
   // Replace the route's waypoints with the refined water-only points

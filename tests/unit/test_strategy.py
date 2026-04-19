@@ -8,7 +8,7 @@ class StubZoneSpatialService:
     def __init__(self, blocked_segments: set[tuple[str, str]]):
         self.blocked_segments = blocked_segments
 
-    def is_route_blocked(self, coordinates: list[list[float]]) -> bool:
+    def is_route_blocked(self, coordinates: list[list[float]], vessel=None) -> bool:
         src = tuple(coordinates[0])
         dst = tuple(coordinates[1])
         return (str(src), str(dst)) in self.blocked_segments

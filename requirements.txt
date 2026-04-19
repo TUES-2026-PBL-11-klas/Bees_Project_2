@@ -17,6 +17,11 @@ httpx
 # Testing
 pytest
 pytest-asyncio
+pytest-cov
+mongomock
 
 mongoengine
 pymongo
+
+# Observability
+prometheus-fastapi-instrumentator
