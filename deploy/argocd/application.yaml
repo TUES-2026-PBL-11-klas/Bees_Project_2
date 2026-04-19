@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/TUES-2026-PBL-11-klas/Bees_Project_2'
+    repoURL: 'https://github.com/tues-2026-pbl-11-klas/bees_project_2'
     targetRevision: HEAD
     path: deploy/kubernetes
   destination:
