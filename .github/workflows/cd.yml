@@ -47,8 +47,11 @@ jobs:
           sed -i "s|^\(\s*image:\s*\).*|\1ghcr.io/${{ env.OWNER }}/${{ env.REPOSITORY }}:${{ github.sha }}|g" deploy/kubernetes/deployment.yaml
 
       - name: Create Pull Request for deployment image update
+        id: create_pr
+        continue-on-error: true
         uses: peter-evans/create-pull-request@v7
         with:
+          token: ${{ secrets.CI_REPO_PAT != '' && secrets.CI_REPO_PAT || github.token }}
           commit-message: "chore: update image tag to ${{ github.sha }} [skip ci]"
           title: "chore: update image tag to ${{ github.sha }}"
           body: |
@@ -60,3 +63,9 @@ jobs:
           delete-branch: true
           add-paths: |
             deploy/kubernetes/deployment.yaml
+
+      - name: PR creation fallback notice
+        if: steps.create_pr.outcome != 'success'
+        run: |
+          echo "create-pull-request could not open/update a PR with current token/policies."
+          echo "Set secret CI_REPO_PAT (repo scope) or enable Actions to create PRs in repository settings."
