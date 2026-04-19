@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/YOUR_GITHUB_ORG/Bees_Project_2.git' # TODO: Replace with actual repo URL
+    repoURL: 'https://github.com/TUES-2026-PBL-11-klas/Bees_Project_2'
     targetRevision: HEAD
     path: deploy/kubernetes
   destination:
