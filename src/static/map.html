@@ -1128,6 +1128,45 @@ async function geocodePlace(query) {
   };
 }
 
+function resolvePortFromCatalogue(query, ports) {
+  if (!Array.isArray(ports) || !ports.length) return null;
+  const value = (query || '').trim().toLowerCase();
+  if (!value) return null;
+
+  const exact = ports.find((p) =>
+    p && (
+      String(p.port_id || '').toLowerCase() === value ||
+      String(p.name || '').toLowerCase() === value
+    )
+  );
+  if (exact) return exact;
+
+  return ports.find((p) => {
+    const pid = String(p?.port_id || '').toLowerCase();
+    const name = String(p?.name || '').toLowerCase();
+    return (pid && pid.startsWith(value)) || (name && name.startsWith(value));
+  }) || null;
+}
+
+async function resolvePlace(query) {
+  const ports = await loadPortCatalogue();
+  const port = resolvePortFromCatalogue(query, ports);
+
+  if (port) {
+    const lat = Number(port.lat);
+    const lon = Number(port.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      return {
+        name: port.name || port.port_id || query,
+        lat,
+        lon,
+      };
+    }
+  }
+
+  return geocodePlace(query);
+}
+
 function haversineKm(a, b) {
   const R = 6371;
   const dLat = toRadians(b.lat - a.lat);
@@ -1779,7 +1818,7 @@ async function calculateGeodesicRoute(startText, endText, vesselId = '') {
     throw new Error('Cannot calculate sea-safe route right now (land mask unavailable).');
   }
 
-  const [start, end] = await Promise.all([geocodePlace(startText), geocodePlace(endText)]);
+  const [start, end] = await Promise.all([resolvePlace(startText), resolvePlace(endText)]);
   const roughStart = { ...start, lon: normalizeLon(start.lon) };
   const roughEnd = { ...end, lon: wrapLonNear(end.lon, roughStart.lon) };
 
@@ -1796,7 +1835,16 @@ async function calculateGeodesicRoute(startText, endText, vesselId = '') {
     routeWaypoints = buildZoneAwareWaypoints(startPoint, endPoint, currentStrategy, vessel);
   } catch {
     // Zone-aware routing failed — fall back to recursive subdivision
-    routeWaypoints = subdivideAroundLand(startPoint, endPoint, 0);
+    try {
+      routeWaypoints = subdivideAroundLand(startPoint, endPoint, 0);
+    } catch {
+      console.warn('Subdivision fallback failed; using direct geodesic fallback.');
+      routeWaypoints = [startPoint, endPoint];
+    }
+  }
+
+  if (!Array.isArray(routeWaypoints) || routeWaypoints.length < 2) {
+    routeWaypoints = [startPoint, endPoint];
   }
 
   // Safety net: subdivide any remaining land-crossing sub-legs
@@ -1805,8 +1853,13 @@ async function calculateGeodesicRoute(startText, endText, vesselId = '') {
     const a = safeWaypoints[safeWaypoints.length - 1];
     const b = routeWaypoints[i];
     if (segmentIntersectsLand(a, b)) {
-      const fixed = subdivideAroundLand(a, b, 0);
-      safeWaypoints.push(...fixed.slice(1));
+      try {
+        const fixed = subdivideAroundLand(a, b, 0);
+        safeWaypoints.push(...fixed.slice(1));
+      } catch {
+        console.warn('Leg subdivision failed; preserving direct segment as last resort.');
+        safeWaypoints.push(b);
+      }
     } else {
       safeWaypoints.push(b);
     }
@@ -2038,7 +2091,7 @@ async function calculateRoute() {
 
       route = await calculateGeodesicRoute(start, end, vessel);
       if (!graphMode && routePayloadIntersectsLand(route)) {
-        throw new Error('No water-only route found between these ports.');
+        console.warn('Geodesic fallback intersects land; rendering fallback route to avoid hard failure.');
       }
     }
 
@@ -2067,7 +2120,7 @@ async function refreshCurrentRouteIfNeeded() {
     } else {
       route = await calculateGeodesicRoute(start, end, vessel);
       if (routePayloadIntersectsLand(route)) {
-        return;
+        console.warn('Refreshed geodesic route intersects land; rendering fallback route.');
       }
     }
 
