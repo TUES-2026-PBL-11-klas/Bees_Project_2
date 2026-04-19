@@ -20,7 +20,7 @@ def mock_db():
     mongoengine.disconnect_all()
     mongoengine.connect(
         "testdb",
-        host="mongodb://localhost",
+        host="mongomock://localhost",
         mongo_client_class=mongomock.MongoClient,
         uuidRepresentation="standard",
     )

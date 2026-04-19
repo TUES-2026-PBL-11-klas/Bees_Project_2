@@ -19,15 +19,15 @@ for corridor in _CORRIDORS:
     src_id, dst_id = corridor[0], corridor[1]
     if src_id not in PORT_REGISTRY or dst_id not in PORT_REGISTRY:
         continue
-    
+
     src = PORT_REGISTRY[src_id]
     dst = PORT_REGISTRY[dst_id]
-    
+
     lats, lons = points_on_line(src.latitude, src.longitude, dst.latitude, dst.longitude, 100)
-    
+
     # We skip the very first and last point to allow ports to be slightly on land/coast
     is_on_land = globe.is_land(lats[5:-5], lons[5:-5])
-    
+
     if np.any(is_on_land):
         problematic_corridors.append((src_id, dst_id))
         print(f"Land crossed: {src_id} -> {dst_id}")

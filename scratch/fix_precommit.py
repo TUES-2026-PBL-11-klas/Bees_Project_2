@@ -3,14 +3,14 @@ import os
 def fix_file(path):
     with open(path, 'r', encoding='utf-8') as f:
         content = f.read()
-    
+
     # Remove trailing whitespace from each line
     lines = content.splitlines()
     fixed_lines = [line.rstrip() for line in lines]
-    
+
     # Ensure exactly one newline at end of file
     new_content = '\n'.join(fixed_lines) + '\n'
-    
+
     if new_content != content:
         with open(path, 'w', encoding='utf-8') as f:
             f.write(new_content)

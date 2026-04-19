@@ -18,7 +18,7 @@ async function run() {
     fs.writeFileSync('ne_50m_land.geojson', JSON.stringify(data));
     landFeatures = data.features;
   }
-  
+
   const landGeometries = landFeatures.map(f => f.geometry).filter(Boolean);
 
   function wrapLonNear(lon, referenceLon) {
@@ -44,13 +44,13 @@ async function run() {
     const referenceLon = (a.lon + b.lon) / 2;
     const aLon = wrapLonNear(a.lon, referenceLon);
     const bLon = wrapLonNear(b.lon, referenceLon);
-    
+
     // Trim 5% off each end to ignore port coastlines
     const dLat = b.lat - a.lat;
     const dLon = bLon - aLon;
     const p1 = [aLon + dLon * 0.05, a.lat + dLat * 0.05];
     const p2 = [bLon - dLon * 0.05, b.lat - dLat * 0.05];
-    
+
     const segment = [ p1, p2 ];
     const line = turf.lineString(segment);
     const [lineMinLon, lineMinLat, lineMaxLon, lineMaxLat] = turf.bbox(line);
