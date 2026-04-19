@@ -1251,6 +1251,28 @@ function segmentIntersectsLand(start, end) {
   try {
     const { referenceLon, segments } = buildWrappedGreatCircleSegments(start, end, 64);
 
+    const linePenetratesLand = (line, landGeometry) => {
+      if (!turf.booleanIntersects(line, landGeometry)) {
+        return false;
+      }
+
+      const lineLengthKm = turf.length(line, { units: 'kilometers' });
+      if (!Number.isFinite(lineLengthKm) || lineLengthKm <= 0.2) {
+        return false;
+      }
+
+      const sampleFractions = [0.2, 0.35, 0.5, 0.65, 0.8];
+      for (const frac of sampleFractions) {
+        const distance = Math.max(0.01, lineLengthKm * frac);
+        const point = turf.along(line, distance, { units: 'kilometers' });
+        if (turf.booleanPointInPolygon(point, landGeometry, { ignoreBoundary: true })) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
     return segments.some(segment => {
       const trimmed = segment.length > 6 ? segment.slice(2, -2) : segment;
       if (trimmed.length < 2) {
@@ -1274,7 +1296,7 @@ function segmentIntersectsLand(start, end) {
 
         if (disjoint) continue;
 
-        if (turf.booleanIntersects(line, landGeometry)) {
+        if (linePenetratesLand(line, landGeometry)) {
           return true;
         }
       }
