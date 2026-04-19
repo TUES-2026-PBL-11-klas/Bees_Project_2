@@ -3,7 +3,7 @@ from datetime import datetime
 
 class Waypoint(me.EmbeddedDocument):
     sequence = me.IntField(required=True)
-    coordinates = me.ListField(me.FloatField(), required=True)  # [lon, lat]
+    coordinates = me.ListField(me.FloatField(), required=True)
     point_type = me.StringField(choices=["waypoint", "port", "canal", "checkpoint"])
     name = me.StringField(null=True)
 

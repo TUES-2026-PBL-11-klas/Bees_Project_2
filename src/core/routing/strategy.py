@@ -29,9 +29,9 @@ class VesselConstraints:
     beam_m: Optional[float] = None
 
 
-# ── Default vessel assumptions ────────────────────────────────────────────
-DEFAULT_SPEED_KNOTS = 14.0          # average cargo ship cruising speed
-DEFAULT_FUEL_RATE = 0.05            # tonnes per NM (conservative default)
+
+DEFAULT_SPEED_KNOTS = 14.0
+DEFAULT_FUEL_RATE = 0.05
 METRES_PER_NM = 1852.0
 
 
@@ -85,7 +85,7 @@ class EcoStrategy(RoutingStrategy):
     ) -> Optional[List[Waypoint]]:
         eco_graph = _prepare_graph(graph, vessel)
 
-        # Additionally block edges that intersect active zones
+
         for node_id in list(eco_graph._adjacency.keys()):
             for edge in eco_graph._adjacency.get(node_id, []):
                 if edge.is_blocked:
@@ -102,11 +102,11 @@ class EcoStrategy(RoutingStrategy):
         return eco_graph.find_path(start_id, end_id)
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────
+
 
 def _copy_graph(graph: NavigationGraph) -> NavigationGraph:
     """Deep-copy a NavigationGraph (nodes + edges) for safe mutation."""
-    from src.core.graph import Edge as _Edge  # local to avoid circular
+    from src.core.graph import Edge as _Edge
 
     copied = NavigationGraph()
     for waypoint in graph.get_all_waypoints():

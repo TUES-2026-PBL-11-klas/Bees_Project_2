@@ -11,7 +11,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-# 1. VPC Module
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "5.5.0"
@@ -28,7 +27,6 @@ module "vpc" {
   enable_dns_hostnames = true
 }
 
-# 2. EKS Cluster Module
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "20.5.0"
@@ -53,7 +51,6 @@ module "eks" {
   }
 }
 
-# 3. Configuration & Secrets Management (AWS Secrets Manager)
 resource "aws_secretsmanager_secret" "mongodb_uri" {
   name        = "clearwake/mongodb-uri"
   description = "MongoDB connection string for the API"
@@ -64,7 +61,6 @@ resource "aws_secretsmanager_secret_version" "mongodb_uri_val" {
   secret_string = jsonencode({ "MONGODB_URI" = var.mongodb_uri })
 }
 
-# 4. S3 Bucket for Route Artifacts/Observability Logs
 resource "aws_s3_bucket" "clearwake_data" {
   bucket        = "clearwake-data-${var.environment}"
   force_destroy = true

@@ -34,8 +34,8 @@ def client(mock_db):
     from src.core.events.dispatcher import dispatcher
     dispatcher._audit_repo = MagicMock()
 
-    # Patch lifespan hooks where they are used (src.main), not where defined.
-    with patch("src.main.init_db"), \
+
+    with patch("src.main.init_db"),\
          patch("src.main.close_db"):
         from src.main import app
         with TestClient(app, raise_server_exceptions=True) as c:

@@ -35,14 +35,14 @@ class ZoneSpatialService:
                 c = getattr(zone, 'canal_constraints', None)
                 if not c:
                     continue
-                # Check allowed/blocked types
+
                 if c.allowed_vessel_types and vessel.vessel_type not in c.allowed_vessel_types:
                     blocking.append(zone)
                     continue
                 if c.blocked_vessel_types and vessel.vessel_type in c.blocked_vessel_types:
                     blocking.append(zone)
                     continue
-                # Check dimensions
+
                 if c.max_draft_m and vessel.max_draft_m and vessel.max_draft_m > c.max_draft_m:
                     blocking.append(zone)
                     continue

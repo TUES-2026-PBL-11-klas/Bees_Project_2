@@ -6,7 +6,7 @@ from src.main import app
 
 @pytest.fixture
 def client():
-    # Keep FastAPI lifespan from opening a real DB connection during tests.
+
     with patch("src.main.init_db"), patch("src.main.close_db"):
         import mongoengine
         import mongomock

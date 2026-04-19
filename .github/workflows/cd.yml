@@ -36,7 +36,6 @@ jobs:
 
       - name: Update Kubernetes Deployment with new image tag
         run: |
-          # Replace the old image tag with the new github.sha tag
           sed -i 's|image: clearwake/api:.*|image: ghcr.io/${{ github.repository }}/clearwake-api:${{ github.sha }}|g' deploy/kubernetes/deployment.yaml
 
           git config --global user.name "GitHub Actions"
