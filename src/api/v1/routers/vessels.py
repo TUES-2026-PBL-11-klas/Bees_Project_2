@@ -6,12 +6,17 @@ from fastapi import APIRouter, HTTPException, Query
 
 from src.core.services.vessel_status_service import VesselStatusService
 from src.infrastructure.repositories.vessel_repository import VesselRepository
-from src.models.vessel import Vessel as VesselModel
+from src.models.vessel import VESSEL_TYPE_OPTIONS, Vessel as VesselModel
 from src.schemas.vessel import VesselCreateSchema, VesselUpdateSchema
 
 router = APIRouter(prefix="/api/v1/vessels", tags=["vessels"])
 repo = VesselRepository()
 status_service = VesselStatusService(repo)
+
+
+@router.get("/types")
+def get_vessel_types():
+    return VESSEL_TYPE_OPTIONS
 
 
 @router.get("/")

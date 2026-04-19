@@ -3,7 +3,7 @@ from __future__ import annotations
 import heapq
 import math
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Return the great-circle distance in metres between two WGS-84 points."""
@@ -48,16 +48,21 @@ class Edge:
     A directed, weighted connection between two :class:`Waypoint` nodes.
 
     Attributes:
-        source:      Origin waypoint.
-        destination: Target waypoint.
-        weight:      Cost of traversal (metres by default; strategies may
-                     override this with fuel-cost or time-cost).
-        is_blocked:  When ``True`` the edge is treated as impassable.
+        source:       Origin waypoint.
+        destination:  Target waypoint.
+        weight:       Cost of traversal (metres by default; strategies may
+                      override this with fuel-cost or time-cost).
+        is_blocked:   When ``True`` the edge is treated as impassable.
+        max_draft_m:  Maximum vessel draft (in metres) allowed on this
+                      passage.  ``None`` means no restriction.
     """
     source: Waypoint
     destination: Waypoint
     weight: float = field(init=False)
     is_blocked: bool = False
+    max_draft_m: Optional[float] = None
+    max_length_m: Optional[float] = None
+    max_beam_m: Optional[float] = None
 
     def __post_init__(self) -> None:
         self.weight = self.source.distance_to(self.destination)
@@ -106,6 +111,9 @@ class NavigationGraph:
         destination_id: str,
         *,
         bidirectional: bool = False,
+        max_draft_m: Optional[float] = None,
+        max_length_m: Optional[float] = None,
+        max_beam_m: Optional[float] = None,
     ) -> Edge:
         """
         Create a directed edge between two registered waypoints.
@@ -114,6 +122,9 @@ class NavigationGraph:
             source_id:      node_id of the origin waypoint.
             destination_id: node_id of the destination waypoint.
             bidirectional:  If ``True`` a reverse edge is also created.
+            max_draft_m:    Maximum vessel draft allowed on this passage.
+            max_length_m:   Maximum vessel length allowed on this passage.
+            max_beam_m:     Maximum vessel beam allowed on this passage.
 
         Returns:
             The newly created :class:`Edge` (forward direction).
@@ -124,11 +135,11 @@ class NavigationGraph:
         src = self._get_node(source_id)
         dst = self._get_node(destination_id)
 
-        forward = Edge(src, dst)
+        forward = Edge(src, dst, max_draft_m=max_draft_m, max_length_m=max_length_m, max_beam_m=max_beam_m)
         self._adjacency[source_id].append(forward)
 
         if bidirectional:
-            reverse = Edge(dst, src)
+            reverse = Edge(dst, src, max_draft_m=max_draft_m, max_length_m=max_length_m, max_beam_m=max_beam_m)
             self._adjacency[destination_id].append(reverse)
 
         return forward
@@ -216,8 +227,16 @@ class NavigationGraph:
     def get_waypoint(self, node_id: str) -> Waypoint:
         return self._get_node(node_id)
 
+    def has_waypoint(self, node_id: str) -> bool:
+        """Return True if the node_id is registered."""
+        return node_id in self._nodes
+
     def get_all_waypoints(self) -> list[Waypoint]:
         return list(self._nodes.values())
+
+    def get_edges(self, node_id: str) -> List[Edge]:
+        """Return all edges originating from *node_id*."""
+        return self._adjacency.get(node_id, [])
 
     def get_neighbours(self, node_id: str) -> list[Waypoint]:
         """Return all reachable (unblocked) neighbours of a waypoint."""
