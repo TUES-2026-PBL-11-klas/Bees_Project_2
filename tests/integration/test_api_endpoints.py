@@ -6,15 +6,21 @@ from src.main import app
 
 @pytest.fixture
 def client():
-    # Mock database connection to use mongomock
-    with patch("src.infrastructure.database.database.mongoengine.connect") as mock_connect, \
-         patch("src.infrastructure.database.database.mongoengine.disconnect"):
+    # Keep FastAPI lifespan from opening a real DB connection during tests.
+    with patch("src.main.init_db"), patch("src.main.close_db"):
         import mongoengine
         import mongomock
-        mongoengine.connect("testdb", host="mongodb://localhost", mongo_client_class=mongomock.MongoClient)
+
+        mongoengine.disconnect_all()
+        mongoengine.connect(
+            "testdb",
+            host="mongodb://localhost",
+            mongo_client_class=mongomock.MongoClient,
+            uuidRepresentation="standard",
+        )
         with TestClient(app) as test_client:
             yield test_client
-        mongoengine.disconnect()
+        mongoengine.disconnect_all()
 
 def test_get_ports(client: TestClient):
     response = client.get("/api/v1/routes/ports")
