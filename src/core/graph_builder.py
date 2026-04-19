@@ -12,17 +12,17 @@ from src.core.graph import NavigationGraph, Waypoint
 from src.core.ports import PORT_REGISTRY, PortInfo
 
 
-# ---------------------------------------------------------------------------
-# Maritime corridors
-# ---------------------------------------------------------------------------
-# Each tuple is (source_id, destination_id, max_draft_m | None).
-# max_draft_m is the shallowest point along the edge; vessels whose
-# draft exceeds this value must find an alternative.
-# All connections are bidirectional.
-# ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 _CORRIDORS: list[tuple] = [
-    # ── Black Sea internal ────────────────────────────────────────────────
+
     ("VARNA", "CONSTANTA", None),
     ("VARNA", "BURGAS", None),
     ("CONSTANTA", "ODESSA", None),
@@ -33,15 +33,15 @@ _CORRIDORS: list[tuple] = [
     ("CONSTANTA", "SEVASTOPOL", None),
     ("BATUMI", "NOVOROSSIYSK", None),
 
-    # ── Black Sea → Sea of Marmara (Bosphorus) ──────────────────────────
+
     ("VARNA", "ISTANBUL", 15.0),
     ("CONSTANTA", "ISTANBUL", 15.0),
     ("BURGAS", "ISTANBUL", 15.0),
 
-    # ── Sea of Marmara → Aegean (Dardanelles) ───────────────────────────
+
     ("ISTANBUL", "CANAKKALE", 15.0),
 
-    # ── Aegean ────────────────────────────────────────────────────────────
+
     ("CANAKKALE", "WP_NORTH_AEGEAN", None),
     ("WP_NORTH_AEGEAN", "THESSALONIKI", None),
     ("CANAKKALE", "WP_CENTRAL_AEGEAN", None),
@@ -55,7 +55,7 @@ _CORRIDORS: list[tuple] = [
     ("WP_CENTRAL_AEGEAN", "HERAKLION", None),
     ("IZMIR", "WP_CENTRAL_AEGEAN", None),
 
-    # ── South of Greece ──────────────────────────────────────────────────
+
     ("PIRAEUS", "WP_CAPE_MALEAS", None),
     ("WP_CAPE_MALEAS", "WP_SOUTH_PELOPONNESE", None),
     ("WP_CAPE_MALEAS", "HERAKLION", None),
@@ -64,7 +64,7 @@ _CORRIDORS: list[tuple] = [
     ("WP_SOUTH_PELOPONNESE", "WP_SOUTH_CRETE", None),
     ("WP_SOUTH_CRETE", "HERAKLION", None),
 
-    # ── Eastern Mediterranean ─────────────────────────────────────────────
+
     ("IZMIR", "WP_EAST_MED", None),
     ("WP_EAST_MED", "ANTALYA", None),
     ("ANTALYA", "MERSIN", None),
@@ -84,18 +84,18 @@ _CORRIDORS: list[tuple] = [
     ("WP_EAST_MED", "ALEXANDRIA", None),
     ("WP_EAST_MED", "LIMASSOL", None),
 
-    # ── Suez Canal & Red Sea ─────────────────────────────────────────────
+
     ("PORT_SAID", "SUEZ", 20.1, 400.0, 77.5),
     ("SUEZ", "JEDDAH", None),
 
-    # ── Libya coast ──────────────────────────────────────────────────────
+
     ("ALEXANDRIA", "WP_SOUTH_CRETE", None),
     ("BENGHAZI", "TRIPOLI_LY", None),
     ("BENGHAZI", "WP_SOUTH_CRETE", None),
     ("BENGHAZI", "WP_NORTH_AFRICA_MID", None),
     ("TRIPOLI_LY", "WP_NORTH_AFRICA_MID", None),
 
-    # ── Ionian Sea / Strait of Otranto ──────────────────────────────────
+
     ("WP_SOUTH_PELOPONNESE", "WP_IONIAN_SEA", None),
     ("WP_SOUTH_PELOPONNESE", "WP_STRAIT_OTRANTO", None),
     ("WP_IONIAN_SEA", "WP_STRAIT_OTRANTO", None),
@@ -108,7 +108,7 @@ _CORRIDORS: list[tuple] = [
     ("WP_NORTH_AFRICA_MID", "MALTA", None),
     ("WP_NORTH_AFRICA_MID", "WP_SOUTH_SICILY", None),
 
-    # ── Adriatic ─────────────────────────────────────────────────────────
+
     ("WP_STRAIT_OTRANTO", "TARANTO", None),
     ("WP_STRAIT_OTRANTO", "BARI", None),
     ("WP_STRAIT_OTRANTO", "BAR", None),
@@ -124,64 +124,64 @@ _CORRIDORS: list[tuple] = [
     ("SPLIT", "WP_ADRIATIC_MID", None),
     ("BAR", "DUBROVNIK", None),
 
-    # ── Strait of Messina & Tyrrhenian ───────────────────────────────────
+
     ("CATANIA", "WP_EAST_SICILY", None),
     ("WP_EAST_SICILY", "WP_STRAIT_MESSINA", 8.0),
     ("WP_STRAIT_MESSINA", "GIOIA_TAURO", 8.0),
 
-    # ── Tyrrhenian Sea ───────────────────────────────────────────────────
-    # South Tyrrhenian: Naples and nearby ports connect via offshore WP
+
+
     ("NAPLES", "WP_TYRRHENIAN_SOUTH", None),
     ("SALERNO", "WP_TYRRHENIAN_SOUTH", None),
     ("GIOIA_TAURO", "WP_TYRRHENIAN_SOUTH", None),
     ("PALERMO", "WP_TYRRHENIAN_SOUTH", None),
 
-    # Palermo and Catania stay over water via offshore WP
+
     ("CATANIA", "WP_SOUTH_SICILY", None),
 
-    # North Africa connections via sea
+
     ("PALERMO", "WP_CAPE_BON", None),
     ("MALTA", "WP_CAPE_BON", None),
     ("WP_CAPE_BON", "TUNIS", None),
     ("TUNIS", "WP_CAPE_BOUGAROUN", None),
     ("WP_CAPE_BOUGAROUN", "ALGIERS", None),
 
-    # North Tyrrhenian: connects to Italian west-coast ports offshore
+
     ("WP_TYRRHENIAN_SOUTH", "WP_TYRRHENIAN_NORTH", None),
     ("WP_TYRRHENIAN_NORTH", "CIVITAVECCHIA", None),
 
-    # Ligurian Sea: offshore hub between Genoa, Livorno, and Tyrrhenian
+
     ("WP_TYRRHENIAN_NORTH", "WP_LIGURIAN_SEA", None),
     ("LIVORNO", "WP_LIGURIAN_SEA", None),
     ("GENOA", "WP_LIGURIAN_SEA", None),
 
-    # ── Sardinia / Corsica routing ───────────────────────────────────────
-    # East of Sardinia (Tyrrhenian side)
+
+
     ("WP_TYRRHENIAN_NORTH", "WP_SARDINIA_EAST", None),
     ("WP_SARDINIA_EAST", "CAGLIARI", None),
 
-    # South of Sardinia
+
     ("CAGLIARI", "WP_SOUTH_SARDINIA", None),
     ("WP_SOUTH_SARDINIA", "PALERMO", None),
     ("WP_SOUTH_SARDINIA", "WP_SOUTH_SICILY", None),
 
-    # West of Sardinia (towards Balearic Sea)
+
     ("CAGLIARI", "WP_WEST_SARDINIA", None),
     ("WP_WEST_SARDINIA", "WP_BALEARIC_SEA", None),
     ("WP_SOUTH_SARDINIA", "WP_WEST_SARDINIA", None),
 
-    # West of Corsica (for routes between France/Genoa and Sardinia/Tyrrhenian)
+
     ("WP_WEST_CORSICA", "WP_WEST_SARDINIA", None),
     ("WP_WEST_CORSICA", "WP_BALEARIC_SEA", None),
     ("WP_WEST_CORSICA", "WP_LIGURIAN_SEA", None),
     ("WP_WEST_CORSICA", "GENOA", None),
 
-    # Bonifacio Strait (between Corsica and Sardinia, restricted draft)
+
     ("WP_BONIFACIO", "WP_SARDINIA_EAST", None),
     ("WP_BONIFACIO", "WP_WEST_CORSICA", None),
     ("WP_BONIFACIO", "WP_TYRRHENIAN_NORTH", None),
 
-    # ── Western Mediterranean ────────────────────────────────────────────
+
     ("GENOA", "WP_LIGURIAN_SEA", None),
     ("WP_LIGURIAN_SEA", "WP_GULF_OF_LION", None),
     ("WP_GULF_OF_LION", "MARSEILLE", None),
@@ -201,7 +201,7 @@ _CORRIDORS: list[tuple] = [
     ("MALAGA", "ALGECIRAS", None),
     ("ALGECIRAS", "GIBRALTAR", None),
 
-    # ── North Africa (West) ──────────────────────────────────────────────
+
     ("ALGIERS", "WP_ALGERIAN_COAST", None),
     ("WP_ALGERIAN_COAST", "ORAN", None),
     ("ORAN", "WP_ALBORAN_SEA", None),
@@ -212,7 +212,7 @@ _CORRIDORS: list[tuple] = [
     ("TANGIER", "GIBRALTAR", None),
     ("TANGIER", "ALGECIRAS", None),
 
-    # ── Atlantic (Iberian coast) ─────────────────────────────────────────
+
     ("CADIZ", "WP_MOROCCO_COAST", None),
     ("WP_MOROCCO_COAST", "TANGIER", None),
     ("TANGIER", "CASABLANCA", None),
@@ -223,7 +223,7 @@ _CORRIDORS: list[tuple] = [
     ("WP_CAPE_ST_VINCENT", "WP_PORTUGAL_COAST", None),
     ("WP_PORTUGAL_COAST", "LISBON", None),
 
-    # ── Atlantic (northern leg) ──────────────────────────────────────────
+
     ("LISBON", "WP_PORTUGAL_COAST", None),
     ("WP_PORTUGAL_COAST", "WP_CAPE_FINISTERRE", None),
     ("WP_CAPE_FINISTERRE", "WP_NORTH_CORUNA", None),
@@ -256,7 +256,7 @@ def build_navigation_graph() -> NavigationGraph:
     """
     graph = NavigationGraph()
 
-    # Register every port as a waypoint
+
     for port in PORT_REGISTRY.values():
         graph.add_waypoint(Waypoint(
             node_id=port.port_id,
@@ -265,7 +265,7 @@ def build_navigation_graph() -> NavigationGraph:
             name=port.name,
         ))
 
-    # Add edges along corridors
+
     for corridor in _CORRIDORS:
         src_id = corridor[0]
         dst_id = corridor[1]

@@ -20,10 +20,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/routing", tags=["routing"])
 
-# Shared graph (read-only after build)
+
 _GRAPH = build_navigation_graph()
 
-# Fuel multipliers (same as routes.py — mirrors Vessel model subclasses)
+
 _FUEL_MULTIPLIERS: dict[str, float] = {
     "tanker": 1.20, "container_ship": 1.10, "bulk_carrier": 1.15,
     "passenger_ship": 1.18, "ferry": 1.12, "ro_ro_ship": 1.14,

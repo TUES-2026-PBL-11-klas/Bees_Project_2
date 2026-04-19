@@ -29,7 +29,7 @@ class RouteCalculationSchema(BaseModel):
 
 class WaypointOut(BaseModel):
     sequence: int
-    coordinates: List[float]       # [lon, lat]
+    coordinates: List[float]
     point_type: str = "waypoint"
     name: Optional[str] = None
 

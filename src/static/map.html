@@ -267,6 +267,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--ocea
 const MAP_PROVIDER = "__MAP_PROVIDER__";
 const DEMO_COMPANY_ID = '000000000000000000000001';
 let map, zonesLayer, routeLayer, vesselsLayer;
+let landMaskLayer = null, lakeMaskLayer = null;
 let currentStrategy = 'fastest';
 let zonesData = [], vesselsData = [];
 let zonesVisible = true, vesselsVisible = false;
@@ -330,6 +331,8 @@ const zoneColors = {
 };
 
 const LAND_GEOJSON_SOURCES = [
+  '/api/v1/routes/landmask',
+  '/static/ne_50m_land.geojson',
   'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_land.geojson',
   'https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_land.geojson',
 ];
@@ -372,6 +375,49 @@ async function ensureLandGeometriesLoaded() {
   return landGeometries.length > 0;
 }
 
+function landMaskStyleFor(layerName) {
+  if (layerName === 'Dark Ocean') {
+    return {
+      fillColor: '#1e293b',
+      fillOpacity: 0.92,
+      color: '#334155',
+      weight: 0.8,
+      opacity: 0.85,
+    };
+  }
+  return {
+    fillColor: '#000000',
+    fillOpacity: 0,
+    color: '#000000',
+    weight: 0,
+    opacity: 0,
+  };
+}
+
+function lakeMaskStyleFor(layerName) {
+  if (layerName === 'Dark Ocean') {
+    return {
+      fillColor: '#07111f',
+      fillOpacity: 0.95,
+      stroke: false,
+    };
+  }
+  return {
+    fillColor: '#000000',
+    fillOpacity: 0,
+    stroke: false,
+  };
+}
+
+function applyMaskStyle(layerName) {
+  if (landMaskLayer) {
+    landMaskLayer.setStyle(landMaskStyleFor(layerName));
+  }
+  if (lakeMaskLayer) {
+    lakeMaskLayer.setStyle(lakeMaskStyleFor(layerName));
+  }
+}
+
 async function initMap() {
   map = L.map('map', {
     center: [20, 30], zoom: 3, minZoom: 2, maxZoom: 18,
@@ -388,17 +434,59 @@ async function initMap() {
 
   const darkOcean = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, attribution:'&copy; OpenStreetMap &copy; CARTO' });
   const voyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, attribution:'&copy; OpenStreetMap &copy; CARTO' });
+  const positron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, attribution:'&copy; OpenStreetMap &copy; CARTO' });
+  const openStreetMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap contributors' });
 
-  darkOcean.addTo(map);
-  let labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, noWrap:true, pane:'labelPane' }).addTo(map);
+  const baseLayers = {
+    'Dark Ocean': darkOcean,
+    'CARTO Voyager': voyager,
+    'CARTO Positron': positron,
+    'OpenStreetMap': openStreetMap,
+  };
 
-  L.control.layers({'Dark Ocean': darkOcean, 'CARTO Voyager': voyager}, null, { collapsed:true, position:'topright' }).addTo(map);
+  const provider = String(MAP_PROVIDER || '').toLowerCase();
+  const preferredBaseLayerName = (
+    provider === 'carto-dark' ? 'Dark Ocean' :
+    provider === 'carto-positron' ? 'CARTO Positron' :
+    provider === 'osm' ? 'OpenStreetMap' :
+    'CARTO Voyager'
+  );
+
+  const preferredLayer = baseLayers[preferredBaseLayerName] || voyager;
+  preferredLayer.addTo(map);
+
+  let labelsLayer = null;
+  const updateLabelsLayer = (layerName) => {
+    if (labelsLayer && map.hasLayer(labelsLayer)) {
+      map.removeLayer(labelsLayer);
+    }
+
+    const labelsUrl = (
+      layerName === 'Dark Ocean'
+        ? 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png'
+        : (layerName === 'CARTO Voyager' || layerName === 'CARTO Positron')
+          ? 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png'
+          : null
+    );
+
+    if (!labelsUrl) {
+      labelsLayer = null;
+      return;
+    }
+
+    labelsLayer = L.tileLayer(labelsUrl, {
+      subdomains: 'abcd',
+      maxZoom: 20,
+      noWrap: true,
+      pane: 'labelPane',
+    }).addTo(map);
+  };
+  updateLabelsLayer(preferredBaseLayerName);
+
+  L.control.layers(baseLayers, null, { collapsed:true, position:'topright' }).addTo(map);
   map.on('baselayerchange', e => {
-    map.removeLayer(labelsLayer);
-    const url = e.name === 'Dark Ocean'
-      ? 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png';
-    labelsLayer = L.tileLayer(url, { subdomains:'abcd', maxZoom:20, pane:'labelPane' }).addTo(map);
+    updateLabelsLayer(e.name);
+    applyMaskStyle(e.name);
   });
 
   setStatus('Loading geography...');
@@ -412,12 +500,23 @@ async function initMap() {
       if (geom) geom.bbox = turf.bbox(geom);
       return geom;
     }).filter(Boolean);
-    L.geoJSON(land, { pane:'landPane', style:{ fillColor:'#1e293b', fillOpacity:1, color:'#334155', weight:0.8, opacity:0.9 }, interactive:false }).addTo(map);
+    landMaskLayer = L.geoJSON(land, {
+      pane:'landPane',
+      style: landMaskStyleFor(preferredBaseLayerName),
+      interactive:false,
+    }).addTo(map);
   }
   if (!landGeometries.length) {
     notify('Land mask failed to load. Sea-safe routing is unavailable.', 'err');
   }
-  if (lakes) L.geoJSON(lakes, { pane:'lakePane', style:{ fillColor:'#07111f', fillOpacity:1, stroke:false }, interactive:false }).addTo(map);
+  if (lakes) {
+    lakeMaskLayer = L.geoJSON(lakes, {
+      pane:'lakePane',
+      style: lakeMaskStyleFor(preferredBaseLayerName),
+      interactive:false,
+    }).addTo(map);
+  }
+  applyMaskStyle(preferredBaseLayerName);
 
   zonesLayer = L.featureGroup().addTo(map);
   routeLayer = L.featureGroup().addTo(map);
@@ -1029,6 +1128,45 @@ async function geocodePlace(query) {
   };
 }
 
+function resolvePortFromCatalogue(query, ports) {
+  if (!Array.isArray(ports) || !ports.length) return null;
+  const value = (query || '').trim().toLowerCase();
+  if (!value) return null;
+
+  const exact = ports.find((p) =>
+    p && (
+      String(p.port_id || '').toLowerCase() === value ||
+      String(p.name || '').toLowerCase() === value
+    )
+  );
+  if (exact) return exact;
+
+  return ports.find((p) => {
+    const pid = String(p?.port_id || '').toLowerCase();
+    const name = String(p?.name || '').toLowerCase();
+    return (pid && pid.startsWith(value)) || (name && name.startsWith(value));
+  }) || null;
+}
+
+async function resolvePlace(query) {
+  const ports = await loadPortCatalogue();
+  const port = resolvePortFromCatalogue(query, ports);
+
+  if (port) {
+    const lat = Number(port.lat);
+    const lon = Number(port.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      return {
+        name: port.name || port.port_id || query,
+        lat,
+        lon,
+      };
+    }
+  }
+
+  return geocodePlace(query);
+}
+
 function haversineKm(a, b) {
   const R = 6371;
   const dLat = toRadians(b.lat - a.lat);
@@ -1152,6 +1290,28 @@ function segmentIntersectsLand(start, end) {
   try {
     const { referenceLon, segments } = buildWrappedGreatCircleSegments(start, end, 64);
 
+    const linePenetratesLand = (line, landGeometry) => {
+      if (!turf.booleanIntersects(line, landGeometry)) {
+        return false;
+      }
+
+      const lineLengthKm = turf.length(line, { units: 'kilometers' });
+      if (!Number.isFinite(lineLengthKm) || lineLengthKm <= 0.2) {
+        return false;
+      }
+
+      const sampleFractions = [0.2, 0.35, 0.5, 0.65, 0.8];
+      for (const frac of sampleFractions) {
+        const distance = Math.max(0.01, lineLengthKm * frac);
+        const point = turf.along(line, distance, { units: 'kilometers' });
+        if (turf.booleanPointInPolygon(point, landGeometry, { ignoreBoundary: true })) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
     return segments.some(segment => {
       const trimmed = segment.length > 6 ? segment.slice(2, -2) : segment;
       if (trimmed.length < 2) {
@@ -1175,7 +1335,7 @@ function segmentIntersectsLand(start, end) {
 
         if (disjoint) continue;
 
-        if (turf.booleanIntersects(line, landGeometry)) {
+        if (linePenetratesLand(line, landGeometry)) {
           return true;
         }
       }
@@ -1658,7 +1818,7 @@ async function calculateGeodesicRoute(startText, endText, vesselId = '') {
     throw new Error('Cannot calculate sea-safe route right now (land mask unavailable).');
   }
 
-  const [start, end] = await Promise.all([geocodePlace(startText), geocodePlace(endText)]);
+  const [start, end] = await Promise.all([resolvePlace(startText), resolvePlace(endText)]);
   const roughStart = { ...start, lon: normalizeLon(start.lon) };
   const roughEnd = { ...end, lon: wrapLonNear(end.lon, roughStart.lon) };
 
@@ -1675,7 +1835,16 @@ async function calculateGeodesicRoute(startText, endText, vesselId = '') {
     routeWaypoints = buildZoneAwareWaypoints(startPoint, endPoint, currentStrategy, vessel);
   } catch {
     // Zone-aware routing failed — fall back to recursive subdivision
-    routeWaypoints = subdivideAroundLand(startPoint, endPoint, 0);
+    try {
+      routeWaypoints = subdivideAroundLand(startPoint, endPoint, 0);
+    } catch {
+      console.warn('Subdivision fallback failed; using direct geodesic fallback.');
+      routeWaypoints = [startPoint, endPoint];
+    }
+  }
+
+  if (!Array.isArray(routeWaypoints) || routeWaypoints.length < 2) {
+    routeWaypoints = [startPoint, endPoint];
   }
 
   // Safety net: subdivide any remaining land-crossing sub-legs
@@ -1684,8 +1853,13 @@ async function calculateGeodesicRoute(startText, endText, vesselId = '') {
     const a = safeWaypoints[safeWaypoints.length - 1];
     const b = routeWaypoints[i];
     if (segmentIntersectsLand(a, b)) {
-      const fixed = subdivideAroundLand(a, b, 0);
-      safeWaypoints.push(...fixed.slice(1));
+      try {
+        const fixed = subdivideAroundLand(a, b, 0);
+        safeWaypoints.push(...fixed.slice(1));
+      } catch {
+        console.warn('Leg subdivision failed; preserving direct segment as last resort.');
+        safeWaypoints.push(b);
+      }
     } else {
       safeWaypoints.push(b);
     }
@@ -1790,20 +1964,33 @@ async function ensureRouteOverWater(route, vesselId) {
   const hasLandMask = await ensureLandGeometriesLoaded();
   if (!hasLandMask) {
     console.warn('Land mask unavailable — graph route displayed as-is');
-    return;
+    return false;
   }
 
   const wps = (route.waypoints || []).sort((a, b) => a.sequence - b.sequence);
-  if (wps.length < 2) return;
+  if (wps.length < 2) return false;
+
+  const originalWaypoints = JSON.parse(JSON.stringify(route.waypoints || []));
 
   const vessel = getVesselById(vesselId);
+  const routePoints = wps
+    .map((wp) => ({ lat: wp.coordinates?.[1], lon: wp.coordinates?.[0] }))
+    .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon));
+
+  const navigablePoints = routePoints.map((point, idx) => {
+    const toward = routePoints[idx + 1] || routePoints[idx - 1] || null;
+    return findNearestWaterPoint(
+      { lat: point.lat, lon: normalizeLon(point.lon) },
+      toward ? { lat: toward.lat, lon: normalizeLon(toward.lon) } : null,
+    );
+  });
+
   const allRefinedPoints = [];
 
-  for (let i = 0; i < wps.length - 1; i++) {
-    const p1 = { lat: wps[i].coordinates[1], lon: wps[i].coordinates[0] };
-    const p2 = { lat: wps[i + 1].coordinates[1], lon: wps[i + 1].coordinates[0] };
+  for (let i = 0; i < navigablePoints.length - 1; i++) {
+    const p1 = navigablePoints[i];
+    const p2 = navigablePoints[i + 1];
 
-    // Quick check — if the leg is already over water, just smooth it.
     let legCrossesLand = false;
     try { legCrossesLand = segmentIntersectsLand(p1, p2); } catch { /* safe */ }
 
@@ -1813,16 +2000,13 @@ async function ensureRouteOverWater(route, vesselId) {
       continue;
     }
 
-    // ── Leg crosses land — build a water-only waypoint chain ──────────
     let legWaypoints;
     try {
       legWaypoints = buildZoneAwareWaypoints(p1, p2, currentStrategy, vessel);
     } catch {
-      // Zone-aware system couldn't handle it — use recursive subdivision
       legWaypoints = subdivideAroundLand(p1, p2, 0);
     }
 
-    // Safety net: run subdivision over every sub-leg that still crosses land
     const safeLeg = [legWaypoints[0]];
     for (let j = 1; j < legWaypoints.length; j++) {
       const subA = safeLeg[safeLeg.length - 1];
@@ -1846,19 +2030,42 @@ async function ensureRouteOverWater(route, vesselId) {
     point_type: 'waypoint',
   }));
 
-  // Restore metadata (port names, types) from the original waypoints
+  const nearestRoutePointIndex = (target) => {
+    let bestIdx = -1;
+    let bestDistanceKm = Infinity;
+
+    route.waypoints.forEach((wp, idx) => {
+      const point = { lat: wp.coordinates[1], lon: wp.coordinates[0] };
+      const d = haversineKm(target, point);
+      if (d < bestDistanceKm) {
+        bestDistanceKm = d;
+        bestIdx = idx;
+      }
+    });
+
+    return bestDistanceKm <= 200 ? bestIdx : -1;
+  };
+
   wps.forEach(originalWp => {
     if (originalWp.point_type === 'port' || originalWp.name) {
-      const matchIdx = route.waypoints.findIndex(nw =>
-        Math.abs(nw.coordinates[0] - originalWp.coordinates[0]) < 0.01 &&
-        Math.abs(nw.coordinates[1] - originalWp.coordinates[1]) < 0.01
-      );
+      const matchIdx = nearestRoutePointIndex({
+        lat: originalWp.coordinates[1],
+        lon: originalWp.coordinates[0],
+      });
       if (matchIdx !== -1) {
         route.waypoints[matchIdx].point_type = originalWp.point_type;
         route.waypoints[matchIdx].name = originalWp.name;
       }
     }
   });
+
+  if (routePayloadIntersectsLand(route)) {
+    console.warn('Refined route still intersects land; falling back to backend graph route.');
+    route.waypoints = originalWaypoints;
+    return false;
+  }
+
+  return true;
 }
 
 async function calculateRoute() {
@@ -1872,23 +2079,31 @@ async function calculateRoute() {
   try {
     currentRouteRequest = { start, end, vessel };
     let route;
-    // Try the backend graph API first — it handles port name resolution
-    // and vessel constraints (draft, beam, length at straits/canals).
+    let graphMode = false;
+
     try {
       route = await calculateApiGraphRoute(start, end, vessel);
       route.route_mode = 'graph';
-      // Re-route every leg through water using the land-avoidance system
+      graphMode = true;
       await ensureRouteOverWater(route, vessel);
     } catch (graphErr) {
-      // Backend doesn't know this port — fall back to geodesic
       console.log('Graph route failed, trying geodesic:', graphErr.message);
+
       route = await calculateGeodesicRoute(start, end, vessel);
+      if (!graphMode && routePayloadIntersectsLand(route)) {
+        console.warn('Geodesic fallback intersects land; rendering fallback route to avoid hard failure.');
+      }
     }
 
     displayRoute(route);
     notify(`Route calculated — ${route.waypoints?.length||0} points ✓`);
-  } catch(e) { notify(e.message||'Calculation failed','err'); }
-  finally { btn.disabled=false; btn.innerHTML='Calculate Route'; setLoading(false); }
+  } catch(e) {
+    notify(e.message||'Calculation failed','err');
+  } finally {
+    btn.disabled=false;
+    btn.innerHTML='Calculate Route';
+    setLoading(false);
+  }
 }
 
 async function refreshCurrentRouteIfNeeded() {
@@ -1904,6 +2119,9 @@ async function refreshCurrentRouteIfNeeded() {
       await ensureRouteOverWater(route, vessel);
     } else {
       route = await calculateGeodesicRoute(start, end, vessel);
+      if (routePayloadIntersectsLand(route)) {
+        console.warn('Refreshed geodesic route intersects land; rendering fallback route.');
+      }
     }
 
     displayRoute(route);

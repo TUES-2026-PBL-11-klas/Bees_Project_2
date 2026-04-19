@@ -6,7 +6,7 @@ from src.main import app
 
 @pytest.fixture
 def client():
-    # Keep FastAPI lifespan from opening a real DB connection during tests.
+
     with patch("src.main.init_db"), patch("src.main.close_db"):
         import mongoengine
         import mongomock
@@ -58,3 +58,12 @@ def test_calculate_route_invalid_port(client: TestClient):
     assert response.status_code == 404
     data = response.json()
     assert "Port 'FAKE_PORT' not found" in data["detail"]
+
+
+def test_get_landmask_geojson(client: TestClient):
+    response = client.get("/api/v1/routes/landmask")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload.get("type") == "FeatureCollection"
+    assert isinstance(payload.get("features"), list)
+    assert len(payload["features"]) > 0

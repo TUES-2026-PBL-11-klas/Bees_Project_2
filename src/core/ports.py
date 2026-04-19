@@ -26,12 +26,12 @@ class PortInfo:
     aliases: tuple[str, ...] = field(default_factory=tuple)
 
 
-# ---------------------------------------------------------------------------
-# Port catalogue
-# ---------------------------------------------------------------------------
+
+
+
 
 _RAW_PORTS: list[dict] = [
-    # ── Black Sea ─────────────────────────────────────────────────────────
+
     dict(port_id="VARNA", lat=43.2141, lon=27.9147, name="Varna",
          draft=14.0, aliases=("varna",)),
     dict(port_id="CONSTANTA", lat=44.1598, lon=28.6348, name="Constanța",
@@ -47,13 +47,13 @@ _RAW_PORTS: list[dict] = [
     dict(port_id="BURGAS", lat=42.4975, lon=27.4728, name="Burgas",
          draft=12.5, aliases=("burgas", "bourgas")),
 
-    # ── Turkish Straits ───────────────────────────────────────────────────
+
     dict(port_id="ISTANBUL", lat=41.0082, lon=28.9784, name="Istanbul",
          draft=15.0, aliases=("istanbul", "constantinople")),
     dict(port_id="CANAKKALE", lat=40.1553, lon=26.4142, name="Çanakkale",
          draft=15.0, aliases=("canakkale", "dardanelles", "gallipoli")),
 
-    # ── Aegean / Greece ───────────────────────────────────────────────────
+
     dict(port_id="THESSALONIKI", lat=40.6401, lon=22.9444, name="Thessaloniki",
          draft=12.0, aliases=("thessaloniki", "saloniki", "salonica")),
     dict(port_id="PIRAEUS", lat=37.9475, lon=23.6425, name="Piraeus",
@@ -63,7 +63,7 @@ _RAW_PORTS: list[dict] = [
     dict(port_id="PATRAS", lat=38.2466, lon=21.7346, name="Patras",
          draft=12.0, aliases=("patras", "patra")),
 
-    # ── Turkey (Aegean & Med coast) ───────────────────────────────────────
+
     dict(port_id="IZMIR", lat=38.4192, lon=27.1287, name="Izmir",
          draft=14.0, aliases=("izmir", "smyrna")),
     dict(port_id="ANTALYA", lat=36.8841, lon=30.7056, name="Antalya",
@@ -73,7 +73,7 @@ _RAW_PORTS: list[dict] = [
     dict(port_id="ISKENDERUN", lat=36.5867, lon=36.1654, name="İskenderun",
          draft=14.0, aliases=("iskenderun", "alexandretta")),
 
-    # ── Cyprus & Levant ───────────────────────────────────────────────────
+
     dict(port_id="LIMASSOL", lat=34.6747, lon=33.0420, name="Limassol",
          draft=14.0, aliases=("limassol", "lemesos", "cyprus")),
     dict(port_id="BEIRUT", lat=33.9000, lon=35.5000, name="Beirut",
@@ -85,13 +85,13 @@ _RAW_PORTS: list[dict] = [
     dict(port_id="ALEXANDRIA", lat=31.2001, lon=29.9187, name="Alexandria",
          draft=15.0, aliases=("alexandria", "alex")),
 
-    # ── Suez & Red Sea ────────────────────────────────────────────────────
+
     dict(port_id="SUEZ", lat=29.9668, lon=32.5498, name="Suez",
          draft=20.1, aliases=("suez", "suez canal")),
     dict(port_id="JEDDAH", lat=21.4858, lon=39.1925, name="Jeddah",
          draft=16.0, aliases=("jeddah", "jiddah")),
 
-    # ── North Africa ──────────────────────────────────────────────────────
+
     dict(port_id="BENGHAZI", lat=32.1167, lon=20.0667, name="Benghazi",
          draft=10.0, aliases=("benghazi",)),
     dict(port_id="TRIPOLI_LY", lat=32.8752, lon=13.1875, name="Tripoli (Libya)",
@@ -107,7 +107,7 @@ _RAW_PORTS: list[dict] = [
     dict(port_id="CASABLANCA", lat=33.5731, lon=-7.5898, name="Casablanca",
          draft=14.0, aliases=("casablanca",)),
 
-    # ── Italy ─────────────────────────────────────────────────────────────
+
     dict(port_id="VENICE", lat=45.4408, lon=12.3155, name="Venice",
          draft=10.0, aliases=("venice", "venezia")),
     dict(port_id="TRIESTE", lat=45.6495, lon=13.7768, name="Trieste",
@@ -137,11 +137,11 @@ _RAW_PORTS: list[dict] = [
     dict(port_id="CAGLIARI", lat=39.2152, lon=9.1097, name="Cagliari",
          draft=14.0, aliases=("cagliari", "sardinia")),
 
-    # ── Malta ─────────────────────────────────────────────────────────────
+
     dict(port_id="MALTA", lat=35.9042, lon=14.5189, name="Valletta (Malta)",
          draft=17.0, aliases=("malta", "valletta")),
 
-    # ── Adriatic (East) ──────────────────────────────────────────────────
+
     dict(port_id="DUBROVNIK", lat=42.6507, lon=17.8947, name="Dubrovnik",
          draft=10.0, aliases=("dubrovnik",)),
     dict(port_id="SPLIT", lat=43.5081, lon=16.4402, name="Split",
@@ -153,7 +153,7 @@ _RAW_PORTS: list[dict] = [
     dict(port_id="BAR", lat=42.0912, lon=19.0970, name="Bar",
          draft=12.0, aliases=("bar", "montenegro")),
 
-    # ── Spain ─────────────────────────────────────────────────────────────
+
     dict(port_id="BARCELONA", lat=41.3851, lon=2.1734, name="Barcelona",
          draft=16.0, aliases=("barcelona",)),
     dict(port_id="VALENCIA", lat=39.4699, lon=-0.3763, name="Valencia",
@@ -169,7 +169,7 @@ _RAW_PORTS: list[dict] = [
     dict(port_id="BILBAO", lat=43.2627, lon=-2.9253, name="Bilbao",
          draft=14.0, aliases=("bilbao",)),
 
-    # ── France ────────────────────────────────────────────────────────────
+
     dict(port_id="MARSEILLE", lat=43.2965, lon=5.3698, name="Marseille",
          draft=14.5, aliases=("marseille", "marsiglia")),
     dict(port_id="SETE", lat=43.4036, lon=3.6966, name="Sète",
@@ -177,17 +177,17 @@ _RAW_PORTS: list[dict] = [
     dict(port_id="LE_HAVRE", lat=49.4944, lon=0.1079, name="Le Havre",
          draft=15.5, aliases=("le havre",)),
 
-    # ── Portugal ──────────────────────────────────────────────────────────
+
     dict(port_id="LISBON", lat=38.7223, lon=-9.1393, name="Lisbon",
          draft=14.5, aliases=("lisbon", "lisboa")),
     dict(port_id="SINES", lat=37.9567, lon=-8.8717, name="Sines",
          draft=28.0, aliases=("sines",)),
 
-    # ── Gibraltar ─────────────────────────────────────────────────────────
+
     dict(port_id="GIBRALTAR", lat=36.1408, lon=-5.3536, name="Gibraltar",
          draft=11.0, aliases=("gibraltar", "gib")),
 
-    # ── Northern Europe ───────────────────────────────────────────────────
+
     dict(port_id="ROTTERDAM", lat=51.9225, lon=4.4792, name="Rotterdam",
          draft=24.0, aliases=("rotterdam",)),
     dict(port_id="ANTWERP", lat=51.2194, lon=4.4025, name="Antwerp",
@@ -201,10 +201,10 @@ _RAW_PORTS: list[dict] = [
     dict(port_id="FELIXSTOWE", lat=51.9559, lon=1.3511, name="Felixstowe",
          draft=16.0, aliases=("felixstowe",)),
 
-    # ── Open-sea routing waypoints ────────────────────────────────────────
-    # These ensure routes curve around land masses instead of cutting through.
-    # EVERY waypoint must be in genuinely open water, and every corridor
-    # leg (straight line between two connected nodes) must stay over sea.
+
+
+
+
     dict(port_id="WP_SOUTH_PELOPONNESE", lat=36.38, lon=22.50,
          name="South Peloponnese (open sea)", draft=None, aliases=()),
     dict(port_id="WP_SOUTH_CRETE", lat=34.80, lon=24.50,
@@ -220,33 +220,33 @@ _RAW_PORTS: list[dict] = [
     dict(port_id="WP_EAST_SICILY", lat=37.10, lon=15.35,
          name="East of Sicily (open sea)", draft=None, aliases=()),
 
-    # Tyrrhenian Sea waypoints — well offshore of the Italian mainland
+
     dict(port_id="WP_TYRRHENIAN_SOUTH", lat=40.00, lon=13.00,
          name="South Tyrrhenian (open sea)", draft=None, aliases=()),
     dict(port_id="WP_TYRRHENIAN_NORTH", lat=42.00, lon=10.50,
          name="North Tyrrhenian (open sea)", draft=None, aliases=()),
 
-    # Ligurian Sea — offshore of the Genoa-Livorno coast
+
     dict(port_id="WP_LIGURIAN_SEA", lat=43.30, lon=9.00,
          name="Ligurian Sea (open sea)", draft=None, aliases=()),
 
-    # West of Corsica — ensures routes from France/Genoa go around Corsica
+
     dict(port_id="WP_WEST_CORSICA", lat=42.00, lon=8.00,
          name="West of Corsica (open sea)", draft=None, aliases=()),
 
-    # Strait of Bonifacio area — between Corsica and Sardinia
+
     dict(port_id="WP_BONIFACIO", lat=41.00, lon=9.00,
          name="Strait of Bonifacio (open sea)", draft=11.0, aliases=()),
 
-    # West of Sardinia — open water west of Sardinia
+
     dict(port_id="WP_WEST_SARDINIA", lat=40.00, lon=7.50,
          name="West of Sardinia (open sea)", draft=None, aliases=()),
 
-    # South of Sardinia — open water south of Sardinia
+
     dict(port_id="WP_SOUTH_SARDINIA", lat=38.50, lon=9.00,
          name="South of Sardinia (open sea)", draft=None, aliases=()),
 
-    # East of Sardinia — in the Tyrrhenian, clear of the island
+
     dict(port_id="WP_SARDINIA_EAST", lat=39.50, lon=10.50,
          name="East of Sardinia (open sea)", draft=None, aliases=()),
 
@@ -349,7 +349,7 @@ def resolve_port(query: str) -> Optional[PortInfo]:
     if port_id:
         return PORT_REGISTRY[port_id]
 
-    # Try matching with underscores replaced by spaces
+
     key_spaced = key.replace("_", " ")
     port_id = _LOOKUP_INDEX.get(key_spaced)
     if port_id:

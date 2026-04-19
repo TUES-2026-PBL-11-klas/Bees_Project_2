@@ -1,7 +1,6 @@
 const fs = require('fs');
 const turf = require('@turf/turf');
 
-// Load land geojson
 let landFeatures = [];
 try {
   const landData = JSON.parse(fs.readFileSync('ne_50m_land.geojson', 'utf8'));
@@ -10,7 +9,6 @@ try {
   console.log("Downloading ne_50m_land.geojson...");
 }
 
-// We will fetch it dynamically if not present
 async function run() {
   if (landFeatures.length === 0) {
     const res = await fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_land.geojson');
@@ -45,7 +43,7 @@ async function run() {
     const aLon = wrapLonNear(a.lon, referenceLon);
     const bLon = wrapLonNear(b.lon, referenceLon);
 
-    // Trim 5% off each end to ignore port coastlines
+
     const dLat = b.lat - a.lat;
     const dLon = bLon - aLon;
     const p1 = [aLon + dLon * 0.05, a.lat + dLat * 0.05];
@@ -64,7 +62,7 @@ async function run() {
     return false;
   }
 
-  // Load corridors and ports from python
+
   const execSync = require('child_process').execSync;
   const pythonScript = `
 import json, sys

@@ -1,10 +1,12 @@
 import json
 import logging
 from typing import Optional
+from pathlib import Path
 
 from bson import ObjectId
 from fastapi import APIRouter, HTTPException
 from concurrent.futures import ThreadPoolExecutor
+from fastapi.responses import FileResponse
 
 from src.schemas.route import RouteCalculationSchema
 from src.core.routing.strategy import (
@@ -24,8 +26,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/routes", tags=["routes"])
 repo = RouteRepository()
 
-# ── Fuel-consumption multipliers by vessel type ──────────────────────────
-# Mirrors the multipliers defined in the Vessel model subclasses.
+
+
 _FUEL_MULTIPLIERS: dict[str, float] = {
     "tanker": 1.20,
     "container_ship": 1.10,
@@ -49,24 +51,25 @@ _FUEL_MULTIPLIERS: dict[str, float] = {
     "dredger": 1.32,
 }
 
-# Build the graph once at module load (it's read-only after this).
+
 _GRAPH = build_navigation_graph()
+_LAND_MASK_PATH = Path(__file__).resolve().parents[4] / "ne_50m_land.geojson"
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────
+
 
 def _resolve_node_id(raw: str) -> str:
     """Resolve a user-supplied port/city name to a graph node_id."""
-    # Direct hit (already an exact node_id)?
+
     if _GRAPH.has_waypoint(raw):
         return raw
 
-    # Upper-case hit?
+
     upper = raw.upper().replace(" ", "_")
     if _GRAPH.has_waypoint(upper):
         return upper
 
-    # Look up via the port catalogue
+
     port = resolve_port(raw)
     if port and _GRAPH.has_waypoint(port.port_id):
         return port.port_id
@@ -86,7 +89,7 @@ def _build_vessel_constraints(
 
     Returns None if no vessel info is available (route will use defaults).
     """
-    # Try loading from DB if a valid ObjectId is supplied
+
     if vessel_id and ObjectId.is_valid(vessel_id):
         try:
             from src.infrastructure.repositories.vessel_repository import VesselRepository
@@ -107,7 +110,7 @@ def _build_vessel_constraints(
         except Exception as exc:
             logger.debug("Could not load vessel %s from DB: %s", vessel_id, exc)
 
-    # Fall back to just the vessel_type string
+
     if vessel_type:
         return VesselConstraints(
             vessel_type=vessel_type,
@@ -152,7 +155,7 @@ def _compute_route_stats(
     }
 
 
-# ── Endpoints ────────────────────────────────────────────────────────────
+
 
 @router.get("/ports")
 def get_available_ports():
@@ -164,16 +167,27 @@ def get_available_ports():
     ]
 
 
+@router.get("/landmask")
+def get_landmask_geojson():
+    if not _LAND_MASK_PATH.exists():
+        raise HTTPException(status_code=404, detail="Land mask file is missing")
+    return FileResponse(
+        _LAND_MASK_PATH,
+        media_type="application/geo+json",
+        filename="ne_50m_land.geojson",
+    )
+
+
 @router.post("/calculate")
 def calculate_route(request: RouteCalculationSchema):
-    # 1. Resolve port names
+
     start_id = _resolve_node_id(request.start_node_id)
     end_id = _resolve_node_id(request.end_node_id)
 
-    # 2. Build vessel constraints
+
     vessel = _build_vessel_constraints(request.vessel_id, request.vessel_type)
 
-    # 3. Pick strategy
+
     if request.optimization_mode == "eco":
         strategy = EcoStrategy()
     elif request.optimization_mode == "fastest":
@@ -181,7 +195,7 @@ def calculate_route(request: RouteCalculationSchema):
     else:
         raise HTTPException(status_code=400, detail="Invalid optimization mode. Use 'fastest' or 'eco'.")
 
-    # 4. Calculate
+
     try:
         path = strategy.calculate_route(_GRAPH, start_id, end_id, vessel=vessel)
     except KeyError as e:
@@ -190,7 +204,7 @@ def calculate_route(request: RouteCalculationSchema):
     if not path:
         raise HTTPException(status_code=404, detail=f"No route found from {start_id} to {end_id}.")
 
-    # 5. Build waypoints (only include named ports, skip open-sea waypoints in names)
+
     waypoints = []
     for idx, wp in enumerate(path):
         point_type = "waypoint"
@@ -208,10 +222,10 @@ def calculate_route(request: RouteCalculationSchema):
             "name": wp.name if not wp.node_id.startswith("WP_") else None,
         })
 
-    # 6. Compute stats
+
     stats = _compute_route_stats(path, vessel)
 
-    # 7. Persist route to DB
+
     route_data = {
         "request_id": ObjectId(),
         "company_id": ObjectId(request.company_id) if ObjectId.is_valid(request.company_id) else ObjectId(),
@@ -230,7 +244,7 @@ def calculate_route(request: RouteCalculationSchema):
         logger.warning("Could not persist route to DB: %s", exc)
         result = {"_id": None, "waypoints": waypoints}
 
-    # Merge stats & metadata into response
+
     result["total_distance_nm"] = stats["total_distance_nm"]
     result["estimated_duration_h"] = stats["estimated_duration_h"]
     result["estimated_fuel_tons"] = stats["estimated_fuel_tons"]
