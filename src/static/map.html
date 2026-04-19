@@ -388,17 +388,58 @@ async function initMap() {
 
   const darkOcean = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, attribution:'&copy; OpenStreetMap &copy; CARTO' });
   const voyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, attribution:'&copy; OpenStreetMap &copy; CARTO' });
+  const positron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, attribution:'&copy; OpenStreetMap &copy; CARTO' });
+  const openStreetMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap contributors' });
 
-  darkOcean.addTo(map);
-  let labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, noWrap:true, pane:'labelPane' }).addTo(map);
+  const baseLayers = {
+    'Dark Ocean': darkOcean,
+    'CARTO Voyager': voyager,
+    'CARTO Positron': positron,
+    'OpenStreetMap': openStreetMap,
+  };
 
-  L.control.layers({'Dark Ocean': darkOcean, 'CARTO Voyager': voyager}, null, { collapsed:true, position:'topright' }).addTo(map);
+  const provider = String(MAP_PROVIDER || '').toLowerCase();
+  const preferredBaseLayerName = (
+    provider === 'carto-dark' ? 'Dark Ocean' :
+    provider === 'carto-positron' ? 'CARTO Positron' :
+    provider === 'osm' ? 'OpenStreetMap' :
+    'CARTO Voyager'
+  );
+
+  const preferredLayer = baseLayers[preferredBaseLayerName] || voyager;
+  preferredLayer.addTo(map);
+
+  let labelsLayer = null;
+  const updateLabelsLayer = (layerName) => {
+    if (labelsLayer && map.hasLayer(labelsLayer)) {
+      map.removeLayer(labelsLayer);
+    }
+
+    const labelsUrl = (
+      layerName === 'Dark Ocean'
+        ? 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png'
+        : (layerName === 'CARTO Voyager' || layerName === 'CARTO Positron')
+          ? 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png'
+          : null
+    );
+
+    if (!labelsUrl) {
+      labelsLayer = null;
+      return;
+    }
+
+    labelsLayer = L.tileLayer(labelsUrl, {
+      subdomains: 'abcd',
+      maxZoom: 20,
+      noWrap: true,
+      pane: 'labelPane',
+    }).addTo(map);
+  };
+  updateLabelsLayer(preferredBaseLayerName);
+
+  L.control.layers(baseLayers, null, { collapsed:true, position:'topright' }).addTo(map);
   map.on('baselayerchange', e => {
-    map.removeLayer(labelsLayer);
-    const url = e.name === 'Dark Ocean'
-      ? 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png';
-    labelsLayer = L.tileLayer(url, { subdomains:'abcd', maxZoom:20, pane:'labelPane' }).addTo(map);
+    updateLabelsLayer(e.name);
   });
 
   setStatus('Loading geography...');
