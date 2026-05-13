@@ -1,14 +1,19 @@
 from typing import Optional
+
+from bson import ObjectId
+
 from src.models.zone import Zone
 
-class ZoneRepository:
 
+class ZoneRepository:
     def create(self, zone: Zone) -> Zone:
         zone.save()
         return zone
 
     def get_by_id(self, zone_id: str) -> Optional[Zone]:
-        return Zone.objects(id=zone_id).first()
+        if not ObjectId.is_valid(zone_id):
+            return None
+        return Zone.objects(id=ObjectId(zone_id)).first()
 
     def get_all(self) -> list[Zone]:
         return list(Zone.objects.all())
