@@ -1,0 +1,2203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ClearWake Routing</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@7.1.0/turf.min.js"></script>
+<style>
+:root {
+  --ocean: #07111f;
+  --surface: #0d1e33;
+  --surface2: #132540;
+  --border: rgba(56,189,248,0.12);
+  --border2: rgba(56,189,248,0.22);
+  --accent: #38bdf8;
+  --accent2: #0ea5e9;
+  --danger: #f43f5e;
+  --success: #22c55e;
+  --warn: #f59e0b;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --mono: 'Space Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+  --sidebar: 320px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--ocean); font-family: var(--sans); color: var(--text); }
+.app { display: flex; width: 100%; height: 100vh; }
+.sidebar { width: var(--sidebar); flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; z-index: 1000; }
+.map-wrap { flex: 1; position: relative; overflow: hidden; }
+#map { width: 100%; height: 100%; background: var(--ocean); }
+.sidebar-header { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.brand-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.brand-name { font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; }
+.brand-sub { font-size: 11px; color: var(--muted); font-family: var(--mono); letter-spacing: 0.04em; }
+.tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.tab { flex: 1; padding: 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-family: var(--mono); color: var(--muted); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.sidebar-content { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.sidebar-content::-webkit-scrollbar { width: 4px; }
+.sidebar-content::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.panel { display: none; flex-direction: column; gap: 16px; }
+.panel.active { display: flex; }
+.section-label { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 12px; color: var(--muted); font-weight: 500; }
+.field input, .field select { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 12px; font-family: var(--mono); color: var(--text); width: 100%; outline: none; transition: border-color 0.15s; }
+.field input:focus, .field select:focus { border-color: var(--accent); }
+.field select option { background: var(--surface2); }
+.hint { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.strategy-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: all 0.15s; text-align: center; }
+.strategy-card:hover { border-color: var(--border2); }
+.strategy-card.active { border-color: var(--accent); background: rgba(56,189,248,0.08); }
+.strategy-icon { font-size: 20px; margin-bottom: 6px; }
+.strategy-name { font-size: 11px; font-weight: 600; color: var(--text); font-family: var(--mono); }
+.strategy-desc { font-size: 10px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+.btn { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; font-family: var(--mono); letter-spacing: 0.04em; cursor: pointer; border: none; transition: all 0.15s; width: 100%; }
+.btn-primary { background: var(--accent); color: #07111f; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn-ghost:hover { border-color: var(--border2); color: var(--text); }
+.btn-danger { background: transparent; color: var(--danger); border: 1px solid rgba(244,63,94,0.3); }
+.btn-danger:hover { background: rgba(244,63,94,0.1); }
+.btn-sm { padding: 6px 10px; font-size: 11px; }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 600; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; }
+.badge-active { background: rgba(34,197,94,0.15); color: var(--success); }
+.badge-inactive { background: rgba(100,116,139,0.15); color: var(--muted); }
+.badge-eco { background: rgba(34,197,94,0.12); color: var(--success); }
+.badge-conflict { background: rgba(244,63,94,0.12); color: var(--danger); }
+.badge-canal { background: rgba(245,158,11,0.12); color: var(--warn); }
+.badge-temporary { background: rgba(56,189,248,0.12); color: var(--accent); }
+.zone-list { display: flex; flex-direction: column; gap: 8px; }
+.vessel-picker { display: flex; flex-direction: column; gap: 8px; }
+.vessel-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.vessel-card:hover { border-color: var(--border2); }
+.vessel-card.active { border-color: var(--accent); background: rgba(56,189,248,0.08); }
+.vessel-card-title { font-size: 12px; font-weight: 600; color: var(--text); }
+.vessel-card-meta { font-size: 10px; color: var(--muted); font-family: var(--mono); display: flex; flex-wrap: wrap; gap: 6px; }
+.zone-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.zone-item-info { flex: 1; min-width: 0; }
+.zone-item-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zone-item-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.zone-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.route-result { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.route-stat { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 12px; }
+.route-stat-label { color: var(--muted); }
+.route-stat-val { font-family: var(--mono); color: var(--accent); font-weight: 700; }
+.divider { height: 1px; background: var(--border); }
+.notif { position: fixed; bottom: 20px; right: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; font-size: 12px; color: var(--text); font-family: var(--mono); max-width: 280px; z-index: 9999; transform: translateY(80px); opacity: 0; transition: all 0.3s; pointer-events: none; }
+.notif.show { transform: translateY(0); opacity: 1; }
+.notif.ok { border-color: rgba(34,197,94,0.4); color: var(--success); }
+.notif.err { border-color: rgba(244,63,94,0.4); color: var(--danger); }
+.empty { text-align: center; padding: 24px 16px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.map-status { position: absolute; bottom: 16px; left: 16px; background: rgba(13,30,51,0.88); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 11px; font-family: var(--mono); color: var(--muted); z-index: 999; backdrop-filter: blur(6px); pointer-events: none; }
+.leaflet-control-layers { background: rgba(13,30,51,0.9) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; color: var(--text) !important; }
+.leaflet-control-layers label { color: var(--muted) !important; font-size: 11px !important; font-family: var(--mono) !important; }
+.leaflet-control-zoom a { background: rgba(13,30,51,0.9) !important; border-color: var(--border) !important; color: var(--muted) !important; }
+.leaflet-control-zoom a:hover { background: var(--surface2) !important; color: var(--accent) !important; }
+.leaflet-bar { border: 1px solid var(--border) !important; border-radius: 8px !important; overflow: hidden; }
+.leaflet-popup-content-wrapper { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; color: var(--text) !important; font-family: var(--mono) !important; font-size: 12px !important; }
+.leaflet-popup-tip { background: var(--surface) !important; }
+.spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(56,189,248,0.3); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+.toggle { position: relative; width: 36px; height: 20px; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; background: var(--surface2); border: 1px solid var(--border); border-radius: 99px; cursor: pointer; transition: 0.2s; }
+.toggle-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 2px; top: 2px; background: var(--muted); border-radius: 50%; transition: 0.2s; }
+.toggle input:checked + .toggle-slider { background: rgba(56,189,248,0.2); border-color: var(--accent); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: var(--accent); }
+.loading-overlay { position: absolute; inset: 0; background: rgba(7,17,31,0.7); display: flex; align-items: center; justify-content: center; z-index: 999; backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.loading-overlay.show { opacity: 1; pointer-events: all; }
+.loading-box { text-align: center; color: var(--accent); font-family: var(--mono); font-size: 12px; }
+.loading-box .spinner { width: 24px; height: 24px; border-width: 3px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <div class="brand-icon">⚓</div>
+        <div>
+          <div class="brand-name">ClearWake</div>
+          <div class="brand-sub">Route Optimization API</div>
+        </div>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-tab="route" onclick="switchTab(this,'route')">Route</button>
+      <button class="tab" data-tab="zones" onclick="switchTab(this,'zones')">Zones</button>
+      <button class="tab" data-tab="vessels" onclick="switchTab(this,'vessels')">Vessels</button>
+    </div>
+    <div class="sidebar-content">
+
+      <!-- ROUTE PANEL -->
+      <div class="panel active" id="panel-route">
+        <div>
+          <div class="section-label">Strategy</div>
+          <div class="strategy-grid">
+            <div class="strategy-card active" id="strat-fastest" onclick="selectStrategy('fastest')">
+              <div class="strategy-icon">⚡</div>
+              <div class="strategy-name">Fastest</div>
+              <div class="strategy-desc">Min travel time</div>
+            </div>
+            <div class="strategy-card" id="strat-eco" onclick="selectStrategy('eco')">
+              <div class="strategy-icon">🌿</div>
+              <div class="strategy-name">Eco</div>
+              <div class="strategy-desc">Min fuel & CO₂</div>
+            </div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="section-label">Waypoints</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div class="field"><label>Origin (port/city or node ID)</label><input type="text" id="startNode" placeholder="e.g. Los Angeles or MALTA" value=""/></div>
+            <div class="field"><label>Destination (port/city or node ID)</label><input type="text" id="endNode" placeholder="e.g. Tokyo or PIRAEUS" value=""/></div>
+          </div>
+        </div>
+        <div>
+          <div class="section-label">Vessel (optional)</div>
+          <div class="field"><select id="vesselSelect"><option value="">— Select vessel —</option></select></div>
+        </div>
+        <button class="btn btn-primary" id="calcBtn" onclick="calculateRoute()">Calculate Route</button>
+        <div id="routeResult" style="display:none;flex-direction:column;gap:8px">
+          <div class="section-label">Result</div>
+          <div class="route-result">
+            <div class="route-stat"><span class="route-stat-label">Waypoints</span><span class="route-stat-val" id="res-waypoints">—</span></div>
+            <div class="route-stat"><span class="route-stat-label">Distance</span><span class="route-stat-val" id="res-distance">—</span></div>
+            <div class="route-stat"><span class="route-stat-label">Duration</span><span class="route-stat-val" id="res-duration">—</span></div>
+            <div class="route-stat"><span class="route-stat-label">Fuel</span><span class="route-stat-val" id="res-fuel">—</span></div>
+            <div class="route-stat"><span class="route-stat-label">Vessel Type</span><span class="route-stat-val" id="res-vessel-type">—</span></div>
+            <div class="route-stat"><span class="route-stat-label">Strategy</span><span class="route-stat-val" id="res-strategy">—</span></div>
+            <div class="route-stat"><span class="route-stat-label">Route ID</span><span class="route-stat-val" id="res-id" style="font-size:9px;word-break:break-all">—</span></div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="clearRoute()">Clear route</button>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="section-label">Map display</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="toggle-row"><span>Show zones</span><label class="toggle"><input type="checkbox" id="toggleZones" checked onchange="toggleZonesLayer(this.checked)"/><span class="toggle-slider"></span></label></div>
+            <div class="toggle-row"><span>Show vessels</span><label class="toggle"><input type="checkbox" id="toggleVessels" onchange="toggleVesselsLayer(this.checked)"/><span class="toggle-slider"></span></label></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ZONES PANEL -->
+      <div class="panel" id="panel-zones">
+        <button class="btn btn-ghost" onclick="showAddZoneForm()">+ Add zone</button>
+        <div id="addZoneForm" style="display:none;flex-direction:column;gap:10px">
+          <div class="section-label">New zone</div>
+          <div class="field"><label>Name</label><input type="text" id="zoneName" placeholder="e.g. Great Barrier Reef"/></div>
+          <div class="field"><label>Type</label><select id="zoneType"><option value="eco">Eco</option><option value="conflict">Conflict</option><option value="canal">Canal</option><option value="temporary">Temporary</option></select></div>
+            <div class="hint">Draw a polygon on the map (recommended), or paste GeoJSON manually.</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" style="flex:1" onclick="startZoneDrawing()">Draw on map</button>
+              <button class="btn btn-ghost btn-sm" style="flex:1" onclick="useViewportZone()">Use view</button>
+              <button class="btn btn-ghost btn-sm" style="flex:1" onclick="clearDrawnZone()">Clear shape</button>
+            </div>
+            <div class="hint" id="drawStatus">No shape drawn yet.</div>
+          <div class="field"><label>GeoJSON geometry</label><input type="text" id="zoneGeometry" placeholder='{"type":"Polygon","coordinates":[...]}' style="font-size:10px"/></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" style="flex:1" onclick="submitZone()">Save</button>
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="hideAddZoneForm()">Cancel</button>
+          </div>
+          <div class="divider"></div>
+        </div>
+        <div>
+          <div class="section-label">Zones <span id="zoneCount" style="color:var(--accent)"></span></div>
+          <div class="zone-list" id="zoneList"><div class="empty">Loading zones...</div></div>
+        </div>
+      </div>
+
+      <!-- VESSELS PANEL -->
+      <div class="panel" id="panel-vessels">
+        <div>
+          <div class="section-label">Fleet <span id="vesselCount" style="color:var(--accent)"></span></div>
+          <div class="field">
+            <label>Filter by vessel type</label>
+            <select id="vesselTypeFilter" onchange="setVesselTypeFilter(this.value)">
+              <option value="">All vessel types</option>
+            </select>
+          </div>
+          <div class="zone-list" id="vesselList"><div class="empty">Loading vessels...</div></div>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="map-status" id="mapStatus">Initializing...</div>
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-box">
+        <div class="spinner"></div>
+        <div id="loadingMsg">Calculating route...</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="notif" id="notif"></div>
+
+<script>
+const MAP_PROVIDER = "__MAP_PROVIDER__";
+const DEMO_COMPANY_ID = '000000000000000000000001';
+let map, zonesLayer, routeLayer, vesselsLayer;
+let landMaskLayer = null, lakeMaskLayer = null;
+let currentStrategy = 'fastest';
+let zonesData = [], vesselsData = [];
+let zonesVisible = true, vesselsVisible = false;
+let vesselTypeFilter = '';
+let vesselTypeOptions = [];
+let selectedRouteVesselId = '';
+let drawnZoneLayer;
+let drawControl;
+let pendingZoneGeometry = null;
+let currentRouteRequest = null;
+let routeRefreshTimer = null;
+let landGeometries = [];
+
+function notify(msg, type = 'ok') {
+  const n = document.getElementById('notif');
+  n.textContent = msg; n.className = `notif show ${type}`;
+  setTimeout(() => n.classList.remove('show'), 3000);
+}
+
+function formatVesselTypeLabel(vesselType) {
+  if (!vesselType) return 'Unknown type';
+  return vesselType
+    .split('_')
+    .map((part) => part ? part.charAt(0).toUpperCase() + part.slice(1) : part)
+    .join(' ');
+}
+
+function getVesselTypeLabel(vesselType) {
+  const option = vesselTypeOptions.find((item) => item.value === vesselType);
+  return option ? option.label : formatVesselTypeLabel(vesselType);
+}
+
+function syncRouteVesselSelection(vesselId) {
+  selectedRouteVesselId = vesselId || '';
+  const select = document.getElementById('vesselSelect');
+  if (select && select.value !== selectedRouteVesselId) {
+    select.value = selectedRouteVesselId;
+  }
+}
+
+function setLoading(show, msg = 'Loading...') {
+  document.getElementById('loadingOverlay').classList.toggle('show', show);
+  document.getElementById('loadingMsg').textContent = msg;
+}
+function setStatus(msg) { document.getElementById('mapStatus').textContent = msg; }
+
+function switchTab(el, tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + tab).classList.add('active');
+}
+function selectStrategy(s) {
+  currentStrategy = s;
+  document.getElementById('strat-fastest').classList.toggle('active', s === 'fastest');
+  document.getElementById('strat-eco').classList.toggle('active', s === 'eco');
+}
+
+const zoneColors = {
+  eco: '#22c55e', conflict: '#f43f5e', canal: '#f59e0b', temporary: '#38bdf8'
+};
+
+const LAND_GEOJSON_SOURCES = [
+  '/api/v1/routes/landmask',
+  '/static/ne_50m_land.geojson',
+  'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_land.geojson',
+  'https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_land.geojson',
+];
+
+const LAKES_GEOJSON_SOURCES = [
+  'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_lakes.geojson',
+  'https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_lakes.geojson',
+];
+
+async function safeJson(url) {
+  try { const r = await fetch(url); if (!r.ok) return null; return r.json(); }
+  catch { return null; }
+}
+
+async function loadFirstAvailableJson(urls) {
+  for (const url of urls) {
+    const payload = await safeJson(url);
+    if (payload) {
+      return payload;
+    }
+  }
+  return null;
+}
+
+async function ensureLandGeometriesLoaded() {
+  if (landGeometries.length) {
+    return true;
+  }
+
+  const land = await loadFirstAvailableJson(LAND_GEOJSON_SOURCES);
+  if (!land) {
+    return false;
+  }
+
+  landGeometries = (land.features || []).map((feature) => {
+    const geom = feature.geometry;
+    if (geom) geom.bbox = turf.bbox(geom);
+    return geom;
+  }).filter(Boolean);
+  return landGeometries.length > 0;
+}
+
+function landMaskStyleFor(layerName) {
+  if (layerName === 'Dark Ocean') {
+    return {
+      fillColor: '#1e293b',
+      fillOpacity: 0.92,
+      color: '#334155',
+      weight: 0.8,
+      opacity: 0.85,
+    };
+  }
+  return {
+    fillColor: '#000000',
+    fillOpacity: 0,
+    color: '#000000',
+    weight: 0,
+    opacity: 0,
+  };
+}
+
+function lakeMaskStyleFor(layerName) {
+  if (layerName === 'Dark Ocean') {
+    return {
+      fillColor: '#07111f',
+      fillOpacity: 0.95,
+      stroke: false,
+    };
+  }
+  return {
+    fillColor: '#000000',
+    fillOpacity: 0,
+    stroke: false,
+  };
+}
+
+function applyMaskStyle(layerName) {
+  if (landMaskLayer) {
+    landMaskLayer.setStyle(landMaskStyleFor(layerName));
+  }
+  if (lakeMaskLayer) {
+    lakeMaskLayer.setStyle(lakeMaskStyleFor(layerName));
+  }
+}
+
+async function initMap() {
+  map = L.map('map', {
+    center: [20, 30], zoom: 3, minZoom: 2, maxZoom: 18,
+    worldCopyJump: true,
+    zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 80,
+  });
+
+  ['landPane','lakePane','zonePane','routePane','vesselPane','labelPane'].forEach((p,i) => {
+    map.createPane(p);
+    map.getPane(p).style.zIndex = 300 + i*30;
+    if (['landPane','lakePane'].includes(p)) map.getPane(p).style.pointerEvents = 'none';
+    if (p === 'labelPane') map.getPane(p).style.pointerEvents = 'none';
+  });
+
+  const darkOcean = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, attribution:'&copy; OpenStreetMap &copy; CARTO' });
+  const voyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, attribution:'&copy; OpenStreetMap &copy; CARTO' });
+  const positron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, attribution:'&copy; OpenStreetMap &copy; CARTO' });
+  const openStreetMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap contributors' });
+
+  const baseLayers = {
+    'Dark Ocean': darkOcean,
+    'CARTO Voyager': voyager,
+    'CARTO Positron': positron,
+    'OpenStreetMap': openStreetMap,
+  };
+
+  const provider = String(MAP_PROVIDER || '').toLowerCase();
+  const preferredBaseLayerName = (
+    provider === 'carto-dark' ? 'Dark Ocean' :
+    provider === 'carto-positron' ? 'CARTO Positron' :
+    provider === 'osm' ? 'OpenStreetMap' :
+    'CARTO Voyager'
+  );
+
+  const preferredLayer = baseLayers[preferredBaseLayerName] || voyager;
+  preferredLayer.addTo(map);
+
+  let labelsLayer = null;
+  const updateLabelsLayer = (layerName) => {
+    if (labelsLayer && map.hasLayer(labelsLayer)) {
+      map.removeLayer(labelsLayer);
+    }
+
+    const labelsUrl = (
+      layerName === 'Dark Ocean'
+        ? 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png'
+        : (layerName === 'CARTO Voyager' || layerName === 'CARTO Positron')
+          ? 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png'
+          : null
+    );
+
+    if (!labelsUrl) {
+      labelsLayer = null;
+      return;
+    }
+
+    labelsLayer = L.tileLayer(labelsUrl, {
+      subdomains: 'abcd',
+      maxZoom: 20,
+      noWrap: true,
+      pane: 'labelPane',
+    }).addTo(map);
+  };
+  updateLabelsLayer(preferredBaseLayerName);
+
+  L.control.layers(baseLayers, null, { collapsed:true, position:'topright' }).addTo(map);
+  map.on('baselayerchange', e => {
+    updateLabelsLayer(e.name);
+    applyMaskStyle(e.name);
+  });
+
+  setStatus('Loading geography...');
+  const [land, lakes] = await Promise.all([
+    loadFirstAvailableJson(LAND_GEOJSON_SOURCES),
+    loadFirstAvailableJson(LAKES_GEOJSON_SOURCES),
+  ]);
+  if (land) {
+    landGeometries = (land.features || []).map(feature => {
+      const geom = feature.geometry;
+      if (geom) geom.bbox = turf.bbox(geom);
+      return geom;
+    }).filter(Boolean);
+    landMaskLayer = L.geoJSON(land, {
+      pane:'landPane',
+      style: landMaskStyleFor(preferredBaseLayerName),
+      interactive:false,
+    }).addTo(map);
+  }
+  if (!landGeometries.length) {
+    notify('Land mask failed to load. Sea-safe routing is unavailable.', 'err');
+  }
+  if (lakes) {
+    lakeMaskLayer = L.geoJSON(lakes, {
+      pane:'lakePane',
+      style: lakeMaskStyleFor(preferredBaseLayerName),
+      interactive:false,
+    }).addTo(map);
+  }
+  applyMaskStyle(preferredBaseLayerName);
+
+  zonesLayer = L.featureGroup().addTo(map);
+  routeLayer = L.featureGroup().addTo(map);
+  vesselsLayer = L.featureGroup();
+  drawnZoneLayer = new L.FeatureGroup().addTo(map);
+
+  drawControl = new L.Control.Draw({
+    edit: {
+      featureGroup: drawnZoneLayer,
+      edit: false,
+      remove: false,
+    },
+    draw: {
+      polyline: false,
+      rectangle: false,
+      circle: false,
+      marker: false,
+      circlemarker: false,
+      polygon: {
+        allowIntersection: false,
+        showArea: true,
+        shapeOptions: {
+          color: '#38bdf8',
+          weight: 2,
+          fillColor: '#38bdf8',
+          fillOpacity: 0.18,
+        },
+      },
+    },
+  });
+
+  map.addControl(drawControl);
+
+  map.on(L.Draw.Event.CREATED, (event) => {
+    drawnZoneLayer.clearLayers();
+    const layer = event.layer;
+    drawnZoneLayer.addLayer(layer);
+
+    const geo = layer.toGeoJSON().geometry;
+    pendingZoneGeometry = geo;
+
+    document.getElementById('zoneGeometry').value = JSON.stringify(geo);
+    document.getElementById('drawStatus').textContent = 'Shape captured. You can now save the zone.';
+    notify('Zone shape captured');
+  });
+
+  map.on('zoom', () => setStatus(`Zoom: ${map.getZoom().toFixed(1)}`));
+  map.on('moveend', () => {
+    if (zonesVisible) {
+      renderZonesOnMap();
+    }
+  });
+  setStatus('Ready');
+  await loadVesselTypes();
+  await Promise.all([loadZones(), loadVessels(), loadPortCatalogue()]);
+}
+
+async function loadZones() {
+  try {
+    const r = await fetch('/api/v1/zones/');
+    if (!r.ok) throw new Error();
+    zonesData = await r.json();
+    renderZoneList();
+    renderZonesOnMap();
+    document.getElementById('zoneCount').textContent = `(${zonesData.length})`;
+    refreshCurrentRouteIfNeeded();
+  } catch { document.getElementById('zoneList').innerHTML = '<div class="empty">Could not load zones</div>'; }
+}
+
+async function loadVesselTypes() {
+  try {
+    const r = await fetch('/api/v1/vessels/types');
+    if (!r.ok) throw new Error();
+    vesselTypeOptions = await r.json();
+  } catch {
+    vesselTypeOptions = [];
+  }
+
+  const filter = document.getElementById('vesselTypeFilter');
+  if (filter) {
+    filter.innerHTML = '<option value="">All vessel types</option>' + vesselTypeOptions
+      .map((option) => `<option value="${option.value}">${option.label}</option>`)
+      .join('');
+    filter.value = vesselTypeFilter;
+  }
+}
+
+function renderZoneList() {
+  const el = document.getElementById('zoneList');
+  if (!zonesData.length) { el.innerHTML = '<div class="empty">No zones defined yet</div>'; return; }
+  el.innerHTML = zonesData.map(z => {
+    const id = z._id?.$oid || z._id;
+    return `<div class="zone-item">
+      <div class="zone-item-info">
+        <div class="zone-item-name">${z.name || 'Unnamed zone'}</div>
+        <div class="zone-item-meta">
+          <span class="badge badge-${z.zone_type || 'eco'}">${z.zone_type || '?'}</span>
+          <span class="badge ${z.status === 'inactive' ? 'badge-inactive' : 'badge-active'}">${z.status || 'active'}</span>
+        </div>
+      </div>
+      <div class="zone-item-actions">
+        ${z.status === 'inactive'
+          ? `<button class="btn btn-ghost btn-sm" onclick="activateZone('${id}')">On</button>`
+          : `<button class="btn btn-ghost btn-sm" onclick="deactivateZone('${id}')">Off</button>`}
+        <button class="btn btn-danger btn-sm" onclick="deleteZone('${id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderZonesOnMap() {
+  zonesLayer.clearLayers();
+  if (!zonesVisible) return;
+  const mapCenterLon = map ? map.getCenter().lng : 0;
+
+  zonesData.forEach(z => {
+    if (!z.geometry) return;
+    const c = zoneColors[z.zone_type] || '#38bdf8';
+    const active = z.status !== 'inactive';
+
+    const firstLon = extractFirstLon(z.geometry);
+    const shiftOffset = typeof firstLon === 'number'
+      ? (wrapLonNear(firstLon, mapCenterLon) - firstLon)
+      : 0;
+
+    const shifted = shiftGeometryLongitudes(z.geometry, shiftOffset);
+
+    L.geoJSON(shifted, {
+      pane: 'zonePane',
+      style: { color:c, weight: active?2:1, fillColor:c, fillOpacity: active?0.18:0.05, dashArray: active?null:'6 4', opacity: active?0.9:0.4 }
+    }).bindPopup(`<b>${z.name||'Zone'}</b><br>Type: ${z.zone_type}<br>Status: ${z.status||'active'}`).addTo(zonesLayer);
+  });
+}
+function toggleZonesLayer(v) { zonesVisible = v; renderZonesOnMap(); }
+
+async function activateZone(id) { await fetch(`/api/v1/zones/${id}/activate`,{method:'POST'}); notify('Zone activated'); await loadZones(); }
+async function deactivateZone(id) { await fetch(`/api/v1/zones/${id}/deactivate`,{method:'POST'}); notify('Zone deactivated'); await loadZones(); }
+async function deleteZone(id) { if(!confirm('Delete this zone?'))return; await fetch(`/api/v1/zones/${id}`,{method:'DELETE'}); notify('Zone deleted'); await loadZones(); }
+
+function showAddZoneForm() { document.getElementById('addZoneForm').style.display = 'flex'; }
+function hideAddZoneForm() {
+  document.getElementById('addZoneForm').style.display = 'none';
+  clearDrawnZone();
+}
+
+function startZoneDrawing() {
+  if (!map || !drawControl) {
+    notify('Map not ready yet', 'err');
+    return;
+  }
+  notify('Click points on the map to draw the polygon. Click the first point to finish.');
+  const drawer = new L.Draw.Polygon(map, drawControl.options.draw.polygon);
+  drawer.enable();
+}
+
+function clearDrawnZone() {
+  pendingZoneGeometry = null;
+  if (drawnZoneLayer) drawnZoneLayer.clearLayers();
+  const input = document.getElementById('zoneGeometry');
+  if (input) input.value = '';
+  const status = document.getElementById('drawStatus');
+  if (status) status.textContent = 'No shape drawn yet.';
+}
+
+function useViewportZone() {
+  if (!map) {
+    notify('Map not ready yet', 'err');
+    return;
+  }
+
+  const bounds = map.getBounds();
+  const west = normalizeLon(bounds.getWest());
+  const east = normalizeLon(bounds.getEast());
+  const south = bounds.getSouth();
+  const north = bounds.getNorth();
+
+  if (Math.abs(east - west) > 180) {
+    notify('Move the map to one side of the date line before using view bounds.', 'err');
+    return;
+  }
+
+  const polygon = {
+    type: 'Polygon',
+    coordinates: [[
+      [west, south],
+      [east, south],
+      [east, north],
+      [west, north],
+      [west, south],
+    ]],
+  };
+
+  pendingZoneGeometry = polygon;
+  if (drawnZoneLayer) {
+    drawnZoneLayer.clearLayers();
+    drawnZoneLayer.addLayer(L.polygon(polygon.coordinates, {
+      color: '#38bdf8',
+      weight: 2,
+      fillColor: '#38bdf8',
+      fillOpacity: 0.18,
+    }));
+  }
+
+  document.getElementById('zoneGeometry').value = JSON.stringify(polygon);
+  document.getElementById('drawStatus').textContent = 'Viewport bounds captured. You can now save the zone.';
+  notify('Viewport zone captured');
+}
+
+async function submitZone() {
+  const name = document.getElementById('zoneName').value.trim();
+  const zone_type = document.getElementById('zoneType').value;
+  const raw = document.getElementById('zoneGeometry').value.trim();
+  if (!name) { notify('Zone name is required','err'); return; }
+
+  let geometry = pendingZoneGeometry;
+  if (!geometry && raw) {
+    try {
+      geometry = JSON.parse(raw);
+    } catch {
+      notify('Invalid GeoJSON','err');
+      return;
+    }
+  }
+
+  geometry = normalizeGeoJsonGeometry(geometry);
+
+  if (geometryCrossesDateline(geometry)) {
+    notify('Zone crosses the date line. Split it into two zones or use a view on one side only.', 'err');
+    return;
+  }
+
+  if (!geometry) {
+    notify('Draw zone on map or paste GeoJSON','err');
+    return;
+  }
+
+  try {
+    const r = await fetch('/api/v1/zones/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,zone_type,geometry})});
+    if (!r.ok) {
+      const payload = await r.json().catch(() => ({}));
+      throw new Error(payload?.detail || payload?.error?.message || 'Failed to create zone');
+    }
+    notify('Zone created ✓');
+    document.getElementById('zoneName').value = '';
+    hideAddZoneForm();
+    await loadZones();
+  } catch (error) { notify(error?.message || 'Failed to create zone','err'); }
+}
+
+async function loadVessels() {
+  try {
+    const r = await fetch('/api/v1/vessels/');
+    if (!r.ok) throw new Error();
+    vesselsData = await r.json();
+
+    if (!vesselsData.length) {
+      try {
+        await bootstrapDemoVessels();
+        const retry = await fetch('/api/v1/vessels/');
+        if (retry.ok) {
+          vesselsData = await retry.json();
+        }
+      } catch (error) {
+        console.warn('Could not bootstrap demo vessels:', error);
+      }
+    }
+
+    if (vesselTypeOptions.length) {
+      try {
+        const addedMissingTypes = await ensureAllVesselTypesAvailable();
+        if (addedMissingTypes) {
+          const retryAllTypes = await fetch('/api/v1/vessels/');
+          if (retryAllTypes.ok) {
+            vesselsData = await retryAllTypes.json();
+          }
+        }
+      } catch (error) {
+        console.warn('Could not seed vessels for all types:', error);
+      }
+    }
+
+    renderVesselList();
+    document.getElementById('vesselCount').textContent = `(${vesselsData.length})`;
+    const sel = document.getElementById('vesselSelect');
+    sel.innerHTML = '<option value="">— Select vessel —</option>';
+    sel.onchange = () => syncRouteVesselSelection(sel.value);
+    vesselsData.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v._id?.$oid || v._id;
+      const typeLabel = getVesselTypeLabel(v.vessel_type);
+      o.textContent = v.name ? `${v.name} (${typeLabel})` : typeLabel;
+      sel.appendChild(o);
+    });
+    if (selectedRouteVesselId) {
+      syncRouteVesselSelection(selectedRouteVesselId);
+    } else {
+      sel.value = '';
+      syncRouteVesselSelection('');
+    }
+  } catch { document.getElementById('vesselList').innerHTML = '<div class="empty">Could not load vessels</div>'; }
+}
+
+async function ensureAllVesselTypesAvailable() {
+  if (!vesselTypeOptions.length) {
+    return false;
+  }
+
+  const existingTypes = new Set(
+    vesselsData
+      .map((vessel) => vessel.vessel_type)
+      .filter((vesselType) => Boolean(vesselType))
+  );
+
+  const missingTypes = vesselTypeOptions.filter((option) => !existingTypes.has(option.value));
+  if (!missingTypes.length) {
+    return false;
+  }
+
+  const seed = Date.now().toString().slice(-8);
+  await Promise.all(missingTypes.map(async (option, index) => {
+    const imoNumber = `IMO8${seed}${String(index).padStart(2, '0')}`;
+    const response = await fetch('/api/v1/vessels/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company_id: DEMO_COMPANY_ID,
+        name: `${option.label} Demo`,
+        vessel_type: option.value,
+        imo_number: imoNumber,
+        fuel_consumption_rate: 1.0,
+        current_status: 'idle',
+      }),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload?.detail || payload?.error?.message || `Failed to create ${option.value} demo vessel`);
+    }
+  }));
+
+  return true;
+}
+
+async function bootstrapDemoVessels() {
+  const seed = Date.now().toString().slice(-6);
+  const demoVessels = [
+    {
+      name: 'Atlantic Pioneer',
+      vessel_type: 'container_ship',
+      imo_number: `IMO9${seed}1`,
+      fuel_consumption_rate: 1.1,
+      current_status: 'idle',
+    },
+    {
+      name: 'Blue Horizon',
+      vessel_type: 'tanker',
+      imo_number: `IMO9${seed}2`,
+      fuel_consumption_rate: 1.3,
+      current_status: 'docked',
+    },
+    {
+      name: 'Northern Star',
+      vessel_type: 'bulk_carrier',
+      imo_number: `IMO9${seed}3`,
+      fuel_consumption_rate: 1.2,
+      current_status: 'idle',
+    },
+  ];
+
+  await Promise.all(demoVessels.map(async (vessel) => {
+    const response = await fetch('/api/v1/vessels/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company_id: DEMO_COMPANY_ID,
+        ...vessel,
+      }),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload?.detail || payload?.error?.message || 'Failed to create demo vessel');
+    }
+  }));
+}
+
+function chooseVesselForRoute(vesselId) {
+  syncRouteVesselSelection(vesselId);
+  const routeTab = document.querySelector('.tab[data-tab="route"]');
+  if (routeTab) {
+    switchTab(routeTab, 'route');
+  }
+  notify('Vessel selected for route');
+}
+
+function setVesselTypeFilter(value) {
+  vesselTypeFilter = value || '';
+  renderVesselList();
+  if (vesselsVisible) {
+    renderVesselsOnMap();
+  }
+}
+
+function getFilteredVessels() {
+  if (!vesselTypeFilter) {
+    return vesselsData;
+  }
+  return vesselsData.filter((vessel) => vessel.vessel_type === vesselTypeFilter);
+}
+
+function renderVesselList() {
+  const el = document.getElementById('vesselList');
+  const filteredVessels = getFilteredVessels();
+  if (!vesselsData.length) { el.innerHTML = '<div class="empty">No vessels registered</div>'; return; }
+  if (!filteredVessels.length) {
+    el.innerHTML = '<div class="empty">No vessels match the selected type</div>';
+    return;
+  }
+  el.innerHTML = filteredVessels.map(v => {
+    const vesselId = v._id?.$oid || v._id || '';
+    return `
+    <div class="zone-item">
+      <div class="zone-item-info">
+        <div class="zone-item-name">${v.name||'Unnamed vessel'}</div>
+        <div class="zone-item-meta">
+          <span class="badge badge-canal">${getVesselTypeLabel(v.vessel_type)}</span>
+          <span class="badge ${v.current_status==='en_route'?'badge-active':'badge-inactive'}">${v.current_status||'idle'}</span>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:var(--mono)">${v.imo_number||''}</div>
+      </div>
+      <div class="zone-item-actions">
+        <button class="btn btn-ghost btn-sm" onclick="chooseVesselForRoute('${vesselId}')">Use</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderVesselsOnMap() {
+  vesselsLayer.clearLayers();
+  getFilteredVessels().forEach(v => {
+    const pos = v.current_position || v.current_location;
+    if (!pos?.coordinates) return;
+    L.circleMarker([pos.coordinates[1], pos.coordinates[0]], {
+      pane:'vesselPane', radius:6, fillColor:'#38bdf8', color:'#fff', weight:2, fillOpacity:1
+    }).bindPopup(`<b>${v.name}</b><br>${getVesselTypeLabel(v.vessel_type)}<br>${v.current_status}`).addTo(vesselsLayer);
+  });
+}
+function toggleVesselsLayer(v) {
+  vesselsVisible = v;
+  if (v) { vesselsLayer.addTo(map); renderVesselsOnMap(); } else { map.removeLayer(vesselsLayer); }
+}
+
+function toRadians(v) { return v * Math.PI / 180; }
+function toDegrees(v) { return v * 180 / Math.PI; }
+
+function normalizeLon(lon) {
+  let out = lon;
+  while (out > 180) out -= 360;
+  while (out < -180) out += 360;
+  return out;
+}
+
+function wrapLonNear(lon, referenceLon) {
+  let wrapped = lon;
+  while (wrapped - referenceLon > 180) wrapped -= 360;
+  while (wrapped - referenceLon < -180) wrapped += 360;
+  return wrapped;
+}
+
+function shiftGeometryLongitudes(geometry, offsetLon) {
+  if (!geometry || !geometry.coordinates || !offsetLon) {
+    return geometry;
+  }
+
+  const shiftCoords = (coords) => {
+    if (!Array.isArray(coords)) return coords;
+    if (coords.length >= 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+      return [coords[0] + offsetLon, coords[1]];
+    }
+    return coords.map(shiftCoords);
+  };
+
+  return {
+    ...geometry,
+    coordinates: shiftCoords(geometry.coordinates),
+  };
+}
+
+function wrapGeometryLongitudes(geometry, referenceLon) {
+  if (!geometry || !geometry.coordinates) {
+    return geometry;
+  }
+
+  const wrapCoords = (coords) => {
+    if (!Array.isArray(coords)) return coords;
+    if (coords.length >= 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+      return [wrapLonNear(coords[0], referenceLon), coords[1]];
+    }
+    return coords.map(wrapCoords);
+  };
+
+  return {
+    ...geometry,
+    coordinates: wrapCoords(geometry.coordinates),
+  };
+}
+
+function extractFirstLon(geometry) {
+  if (!geometry || !geometry.coordinates) {
+    return null;
+  }
+
+  const findLon = (coords) => {
+    if (!Array.isArray(coords)) return null;
+    if (coords.length >= 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+      return coords[0];
+    }
+    for (const item of coords) {
+      const lon = findLon(item);
+      if (typeof lon === 'number') {
+        return lon;
+      }
+    }
+    return null;
+  };
+
+  return findLon(geometry.coordinates);
+}
+
+function normalizeGeometryCoordinates(coordinates) {
+  if (!Array.isArray(coordinates)) return coordinates;
+
+  if (coordinates.length >= 2 && typeof coordinates[0] === 'number' && typeof coordinates[1] === 'number') {
+    return [normalizeLon(coordinates[0]), coordinates[1]];
+  }
+
+  return coordinates.map(normalizeGeometryCoordinates);
+}
+
+function normalizeGeoJsonGeometry(geometry) {
+  if (!geometry || !geometry.coordinates) return geometry;
+  return {
+    ...geometry,
+    coordinates: normalizeGeometryCoordinates(geometry.coordinates),
+  };
+}
+
+function geometryCrossesDateline(geometry) {
+  if (!geometry || !geometry.coordinates) return false;
+
+  const longitudes = [];
+  const collect = (coords) => {
+    if (!Array.isArray(coords)) return;
+    if (coords.length >= 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+      longitudes.push(coords[0]);
+      return;
+    }
+    coords.forEach(collect);
+  };
+
+  collect(geometry.coordinates);
+  if (!longitudes.length) return false;
+
+  return (Math.max(...longitudes) - Math.min(...longitudes)) > 180;
+}
+
+let _portCatalogueCache = null;
+async function loadPortCatalogue() {
+  if (_portCatalogueCache) return _portCatalogueCache;
+  try {
+    const r = await fetch('/api/v1/routes/ports');
+    if (r.ok) _portCatalogueCache = await r.json();
+  } catch (e) { /* ignore */ }
+  return _portCatalogueCache || [];
+}
+
+function isGraphNodeId(value) {
+  if (!value) return false;
+  // Node IDs are uppercase + underscore (VARNA, PORT_SAID, etc.)
+  if (/^[A-Z0-9_]+$/.test(value)) return true;
+  // Also accept known port names in any case — the backend handles resolution
+  if (_portCatalogueCache && _portCatalogueCache.length) {
+    const lower = value.toLowerCase();
+    return _portCatalogueCache.some(p =>
+      p.port_id.toLowerCase() === lower ||
+      p.name.toLowerCase() === lower ||
+      p.name.toLowerCase().startsWith(lower)
+    );
+  }
+  return false;
+}
+
+async function geocodePlace(query) {
+  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`;
+  const resp = await fetch(url, {
+    headers: {
+      'Accept': 'application/json'
+    }
+  });
+  if (!resp.ok) throw new Error(`Geocoding failed for ${query}`);
+  const data = await resp.json();
+  if (!Array.isArray(data) || !data.length) {
+    throw new Error(`No location found for "${query}"`);
+  }
+  return {
+    name: data[0].display_name,
+    lat: Number(data[0].lat),
+    lon: Number(data[0].lon),
+  };
+}
+
+function resolvePortFromCatalogue(query, ports) {
+  if (!Array.isArray(ports) || !ports.length) return null;
+  const value = (query || '').trim().toLowerCase();
+  if (!value) return null;
+
+  const exact = ports.find((p) =>
+    p && (
+      String(p.port_id || '').toLowerCase() === value ||
+      String(p.name || '').toLowerCase() === value
+    )
+  );
+  if (exact) return exact;
+
+  return ports.find((p) => {
+    const pid = String(p?.port_id || '').toLowerCase();
+    const name = String(p?.name || '').toLowerCase();
+    return (pid && pid.startsWith(value)) || (name && name.startsWith(value));
+  }) || null;
+}
+
+async function resolvePlace(query) {
+  const ports = await loadPortCatalogue();
+  const port = resolvePortFromCatalogue(query, ports);
+
+  if (port) {
+    const lat = Number(port.lat);
+    const lon = Number(port.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      return {
+        name: port.name || port.port_id || query,
+        lat,
+        lon,
+      };
+    }
+  }
+
+  return geocodePlace(query);
+}
+
+function haversineKm(a, b) {
+  const R = 6371;
+  const dLat = toRadians(b.lat - a.lat);
+  const dLon = toRadians(b.lon - a.lon);
+  const lat1 = toRadians(a.lat);
+  const lat2 = toRadians(b.lat);
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * (Math.sin(dLon / 2) ** 2);
+  return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+function interpolateGreatCircle(a, b, fraction) {
+  const lat1 = toRadians(a.lat);
+  const lon1 = toRadians(a.lon);
+  const lat2 = toRadians(b.lat);
+  const lon2 = toRadians(b.lon);
+
+  const angularDistance = 2 * Math.asin(Math.sqrt(
+    Math.sin((lat2 - lat1) / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin((lon2 - lon1) / 2) ** 2
+  ));
+
+  if (angularDistance === 0) {
+    return { lat: a.lat, lon: a.lon };
+  }
+
+  const A = Math.sin((1 - fraction) * angularDistance) / Math.sin(angularDistance);
+  const B = Math.sin(fraction * angularDistance) / Math.sin(angularDistance);
+
+  const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+  const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+  const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+
+  const lat = Math.atan2(z, Math.sqrt(x * x + y * y));
+  const lon = Math.atan2(y, x);
+
+  return { lat: toDegrees(lat), lon: normalizeLon(toDegrees(lon)) };
+}
+
+function buildGreatCircleLeg(a, b, steps = 96) {
+  const points = [];
+  for (let i = 0; i <= steps; i += 1) {
+    points.push(interpolateGreatCircle(a, b, i / steps));
+  }
+  return points;
+}
+
+function unwrapLongitudes(points) {
+  if (!points.length) return [];
+  const out = [{ lat: points[0].lat, lon: points[0].lon }];
+  let prev = points[0].lon;
+
+  for (let i = 1; i < points.length; i += 1) {
+    let lon = points[i].lon;
+    while (lon - prev > 180) lon -= 360;
+    while (lon - prev < -180) lon += 360;
+    out.push({ lat: points[i].lat, lon });
+    prev = lon;
+  }
+  return out;
+}
+
+function buildGeodesicPath(waypoints) {
+  if (waypoints.length < 2) return [];
+  const path = [];
+
+  for (let i = 0; i < waypoints.length - 1; i += 1) {
+    const leg = buildGreatCircleLeg(waypoints[i], waypoints[i + 1]);
+    if (i > 0) leg.shift();
+    path.push(...leg);
+  }
+
+  return unwrapLongitudes(path);
+}
+
+function buildWrappedGreatCircleSegments(start, end, steps = 48) {
+  const referenceLon = (start.lon + end.lon) / 2;
+  const points = buildGreatCircleLeg(start, end, steps);
+  const segments = [];
+  let current = [[wrapLonNear(points[0].lon, referenceLon), points[0].lat]];
+
+  for (let i = 1; i < points.length; i += 1) {
+    const prevLon = wrapLonNear(points[i - 1].lon, referenceLon);
+    const nextLon = wrapLonNear(points[i].lon, referenceLon);
+    const nextLat = points[i].lat;
+
+    if (Math.abs(nextLon - prevLon) > 180) {
+      if (current.length > 1) {
+        segments.push(current);
+      }
+      current = [[nextLon, nextLat]];
+    } else {
+      current.push([nextLon, nextLat]);
+    }
+  }
+
+  if (current.length > 1) {
+    segments.push(current);
+  }
+
+  return { referenceLon, segments };
+}
+
+function segmentIntersectsZone(start, end, zoneGeometry) {
+  if (!zoneGeometry || typeof turf === 'undefined') return false;
+  try {
+    const { referenceLon, segments } = buildWrappedGreatCircleSegments(start, end, 48);
+    const wrappedZone = wrapGeometryLongitudes(zoneGeometry, referenceLon);
+
+    return segments.some(segment => {
+      const line = turf.lineString(segment);
+      return turf.booleanIntersects(line, wrappedZone);
+    });
+  } catch {
+    return false;
+  }
+}
+
+function segmentIntersectsLand(start, end) {
+  if (!landGeometries.length || typeof turf === 'undefined') return false;
+
+  try {
+    const { referenceLon, segments } = buildWrappedGreatCircleSegments(start, end, 64);
+
+    const linePenetratesLand = (line, landGeometry) => {
+      if (!turf.booleanIntersects(line, landGeometry)) {
+        return false;
+      }
+
+      const lineLengthKm = turf.length(line, { units: 'kilometers' });
+      if (!Number.isFinite(lineLengthKm) || lineLengthKm <= 0.2) {
+        return false;
+      }
+
+      const sampleFractions = [0.2, 0.35, 0.5, 0.65, 0.8];
+      for (const frac of sampleFractions) {
+        const distance = Math.max(0.01, lineLengthKm * frac);
+        const point = turf.along(line, distance, { units: 'kilometers' });
+        if (turf.booleanPointInPolygon(point, landGeometry, { ignoreBoundary: true })) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
+    return segments.some(segment => {
+      const trimmed = segment.length > 6 ? segment.slice(2, -2) : segment;
+      if (trimmed.length < 2) {
+        return false;
+      }
+
+      // Normalize line to [-180, 180]
+      const normalizedTrimmed = trimmed.map(pt => [normalizeLon(pt[0]), pt[1]]);
+      const line = turf.lineString(normalizedTrimmed);
+      const [lineMinLon, lineMinLat, lineMaxLon, lineMaxLat] = turf.bbox(line);
+
+      for (const landGeometry of landGeometries) {
+        const [landMinLon, landMinLat, landMaxLon, landMaxLat] = landGeometry.bbox;
+
+        const disjoint = (
+          landMaxLon < lineMinLon ||
+          landMinLon > lineMaxLon ||
+          landMaxLat < lineMinLat ||
+          landMinLat > lineMaxLat
+        );
+
+        if (disjoint) continue;
+
+        if (linePenetratesLand(line, landGeometry)) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+  } catch {
+    return false;
+  }
+}
+
+function pointIsOnLand(point) {
+  if (!point || !Number.isFinite(point.lat) || !Number.isFinite(point.lon)) return false;
+  if (!landGeometries.length || typeof turf === 'undefined') return false;
+
+  try {
+    const normalizedLon = normalizeLon(point.lon);
+    const turfPoint = turf.point([normalizedLon, point.lat]);
+
+    for (const landGeometry of landGeometries) {
+      const [landMinLon, landMinLat, landMaxLon, landMaxLat] = landGeometry.bbox;
+      if (normalizedLon < landMinLon || normalizedLon > landMaxLon || point.lat < landMinLat || point.lat > landMaxLat) continue;
+
+      if (turf.booleanPointInPolygon(turfPoint, landGeometry)) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function offsetPointByKm(point, bearingDeg, distanceKm) {
+  const bearing = toRadians(bearingDeg);
+  const dLat = (distanceKm / 111.32) * Math.cos(bearing);
+  const cosLat = Math.max(0.15, Math.cos(toRadians(point.lat)));
+  const dLon = (distanceKm / (111.32 * cosLat)) * Math.sin(bearing);
+
+  return {
+    lat: Math.max(-85, Math.min(85, point.lat + dLat)),
+    lon: normalizeLon(point.lon + dLon),
+  };
+}
+
+function bearingBetween(a, b) {
+  const dLon = wrapLonNear(b.lon, a.lon) - a.lon;
+  const dLat = b.lat - a.lat;
+  const angle = toDegrees(Math.atan2(dLon, dLat));
+  return (angle + 360) % 360;
+}
+
+function findNearestWaterPoint(point, towardPoint = null) {
+  const normalizedPoint = { lat: point.lat, lon: normalizeLon(point.lon) };
+  if (!pointIsOnLand(normalizedPoint)) {
+    return normalizedPoint;
+  }
+
+  const preferredBearing = towardPoint ? bearingBetween(normalizedPoint, towardPoint) : 0;
+
+  for (let radiusKm = 2; radiusKm <= 120; radiusKm += 2) {
+    for (let step = 0; step < 24; step += 1) {
+      const angle = (step * 15) % 360;
+      const candidateBearing = (preferredBearing + angle) % 360;
+      const candidate = offsetPointByKm(normalizedPoint, candidateBearing, radiusKm);
+      if (!pointIsOnLand(candidate)) {
+        return candidate;
+      }
+
+      const mirroredBearing = (preferredBearing - angle + 360) % 360;
+      const mirrorCandidate = offsetPointByKm(normalizedPoint, mirroredBearing, radiusKm);
+      if (!pointIsOnLand(mirrorCandidate)) {
+        return mirrorCandidate;
+      }
+    }
+  }
+
+  return normalizedPoint;
+}
+
+function routeHasBlockedLeg(waypoints) {
+  if (!Array.isArray(waypoints) || waypoints.length < 2) {
+    return false;
+  }
+
+  for (let i = 0; i < waypoints.length - 1; i += 1) {
+    if (segmentIntersectsLand(waypoints[i], waypoints[i + 1])) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function getVesselById(vesselId) {
+  return vesselsData.find((vessel) => (vessel._id?.$oid || vessel._id) === vesselId) || null;
+}
+
+function numberOrNull(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function extractCanalConstraints(zone) {
+  const constraints = {};
+
+  if (zone?.canal_constraints && typeof zone.canal_constraints === 'object') {
+    Object.assign(constraints, zone.canal_constraints);
+  }
+
+  if (typeof zone?.description === 'string' && zone.description.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(zone.description);
+      if (parsed && typeof parsed === 'object') {
+        Object.assign(constraints, parsed.canal_constraints || parsed);
+      }
+    } catch {
+      // keep plain text descriptions untouched
+    }
+  }
+
+  const canalName = String(zone?.name || '').toLowerCase();
+  if (canalName.includes('corinth')) {
+    constraints.max_length_m ??= 240;
+    constraints.max_beam_m ??= 25;
+  } else if (canalName.includes('kiel')) {
+    constraints.max_length_m ??= 235;
+    constraints.max_beam_m ??= 32.5;
+    constraints.max_draft_m ??= 9.5;
+  } else if (canalName.includes('suez')) {
+    constraints.max_length_m ??= 400;
+    constraints.max_beam_m ??= 77.5;
+    constraints.max_draft_m ??= 20.1;
+  }
+
+  return constraints;
+}
+
+function canalSupportsVessel(zone, vessel) {
+  if (!vessel) {
+    return true;
+  }
+
+  const constraints = extractCanalConstraints(zone);
+  const vesselType = vessel.vessel_type;
+  const specs = vessel.specs || {};
+
+  const maxLength = numberOrNull(constraints.max_length_m);
+  const maxBeam = numberOrNull(constraints.max_beam_m);
+  const maxDraft = numberOrNull(constraints.max_draft_m);
+  const vesselLength = numberOrNull(specs.length_m);
+  const vesselBeam = numberOrNull(specs.beam_m);
+  const vesselDraft = numberOrNull(specs.max_draft_m);
+
+  const allowedTypes = Array.isArray(constraints.allowed_vessel_types) ? constraints.allowed_vessel_types : null;
+  const blockedTypes = Array.isArray(constraints.blocked_vessel_types) ? constraints.blocked_vessel_types : null;
+
+  if (allowedTypes && vesselType && !allowedTypes.includes(vesselType)) {
+    return false;
+  }
+
+  if (blockedTypes && vesselType && blockedTypes.includes(vesselType)) {
+    return false;
+  }
+
+  if (maxLength !== null && vesselLength !== null && vesselLength > maxLength) {
+    return false;
+  }
+
+  if (maxBeam !== null && vesselBeam !== null && vesselBeam > maxBeam) {
+    return false;
+  }
+
+  if (maxDraft !== null && vesselDraft !== null && vesselDraft > maxDraft) {
+    return false;
+  }
+
+  return true;
+}
+
+function routePayloadIntersectsLand(route) {
+  const waypoints = (route?.waypoints || []).sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+  if (waypoints.length < 2) {
+    return false;
+  }
+
+  const points = waypoints
+    .map((wp) => ({ lat: wp.coordinates?.[1], lon: wp.coordinates?.[0] }))
+    .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon));
+
+  if (points.length < 2) {
+    return false;
+  }
+
+  return routeHasBlockedLeg(points);
+}
+
+function buildZoneAwareWaypoints(start, end, strategy, vessel = null) {
+  const avoidZones = zonesData.filter(z => {
+    if (!z.geometry || z.status === 'inactive') return false;
+    return z.zone_type !== 'canal';
+  });
+  const blockedCanals = zonesData.filter((zone) => {
+    if (!zone.geometry || zone.zone_type !== 'canal') return false;
+    if (zone.status === 'inactive') return true;
+    return !canalSupportsVessel(zone, vessel);
+  });
+  const baseMargin = strategy === 'eco' ? 4.0 : 2.6;
+  const maxInsertions = 40;
+
+  function findIntersectingZone(a, b) {
+    return avoidZones.find(zone => segmentIntersectsZone(a, b, zone.geometry)) || null;
+  }
+
+  function findIntersectingLandGeometry(a, b) {
+    if (!landGeometries.length || typeof turf === 'undefined') return null;
+
+    try {
+      const { referenceLon, segments } = buildWrappedGreatCircleSegments(a, b, 64);
+
+      for (const segment of segments) {
+        const trimmed = segment.length > 6 ? segment.slice(2, -2) : segment;
+        if (trimmed.length < 2) {
+          continue;
+        }
+
+        const line = turf.lineString(trimmed);
+        const [lineMinLon, lineMinLat, lineMaxLon, lineMaxLat] = turf.bbox(line);
+
+        for (const landGeometry of landGeometries) {
+          const wrappedLand = wrapGeometryLongitudes(landGeometry, referenceLon);
+          const [landMinLon, landMinLat, landMaxLon, landMaxLat] = turf.bbox(wrappedLand);
+
+          const disjoint = (
+            landMaxLon < lineMinLon ||
+            landMinLon > lineMaxLon ||
+            landMaxLat < lineMinLat ||
+            landMinLat > lineMaxLat
+          );
+
+          if (disjoint) {
+            continue;
+          }
+
+          if (turf.booleanIntersects(line, wrappedLand)) {
+            return landGeometry;
+          }
+        }
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
+  }
+
+  function segmentBlockedByObstacle(a, b) {
+    const canal = blockedCanals.find((zone) => segmentIntersectsZone(a, b, zone.geometry));
+    if (canal) {
+      return {
+        kind: canal.status === 'inactive' ? 'canal-closed' : 'canal-restricted',
+        geometry: canal.geometry,
+        name: canal.name || 'Canal',
+      };
+    }
+
+    const zone = findIntersectingZone(a, b);
+    if (zone) {
+      return { kind: 'zone', geometry: zone.geometry };
+    }
+    const landGeometry = findIntersectingLandGeometry(a, b);
+    if (landGeometry) {
+      return { kind: 'land', geometry: landGeometry };
+    }
+    return null;
+  }
+
+  function isNavigableLeg(a, b) {
+    return segmentBlockedByObstacle(a, b) === null;
+  }
+
+  function normalizeCandidate(point) {
+    return {
+      lat: Math.max(-85, Math.min(85, point.lat)),
+      lon: normalizeLon(point.lon),
+    };
+  }
+
+  function scoreDetour(a, candidate, b) {
+    const distanceCost = haversineKm(a, candidate) + haversineKm(candidate, b);
+    const latitudePenalty = Math.abs(candidate.lat) * (strategy === 'eco' ? 0.08 : 0.03);
+    return distanceCost + latitudePenalty;
+  }
+
+  function findBestDetourAroundGeometry(a, b, obstacleGeometry, attemptIndex) {
+    try {
+      const referenceLon = (a.lon + b.lon) / 2;
+      const wrappedZone = wrapGeometryLongitudes(obstacleGeometry, referenceLon);
+      const [minLon, minLat, maxLon, maxLat] = turf.bbox(wrappedZone);
+      const midLon = (minLon + maxLon) / 2;
+      const midLat = (minLat + maxLat) / 2;
+
+      const spanLon = Math.max(0.8, Math.abs(maxLon - minLon));
+      const spanLat = Math.max(0.8, Math.abs(maxLat - minLat));
+      const grow = baseMargin + (attemptIndex * 1.8);
+      const radius = Math.max(spanLon, spanLat) + grow;
+
+      const candidates = [
+        { lat: maxLat + grow, lon: midLon },
+        { lat: minLat - grow, lon: midLon },
+        { lat: midLat, lon: minLon - grow },
+        { lat: midLat, lon: maxLon + grow },
+        { lat: maxLat + grow, lon: maxLon + grow },
+        { lat: maxLat + grow, lon: minLon - grow },
+        { lat: minLat - grow, lon: maxLon + grow },
+        { lat: minLat - grow, lon: minLon - grow },
+      ];
+
+      for (let i = 0; i < 8; i += 1) {
+        const angle = (Math.PI * 2 * i) / 8;
+        candidates.push({
+          lat: midLat + Math.sin(angle) * radius,
+          lon: midLon + Math.cos(angle) * radius,
+        });
+      }
+
+      let best = null;
+      let bestCost = Infinity;
+
+      for (const rawCandidate of candidates) {
+        const candidate = normalizeCandidate(rawCandidate);
+        if (!isNavigableLeg(a, candidate) || !isNavigableLeg(candidate, b)) {
+          continue;
+        }
+
+        const cost = scoreDetour(a, candidate, b);
+        if (cost < bestCost) {
+          best = candidate;
+          bestCost = cost;
+        }
+      }
+
+      return best;
+    } catch {
+      return null;
+    }
+  }
+
+  function findOpenWaterDetour(a, b, attemptIndex) {
+    const wrappedBLon = wrapLonNear(b.lon, a.lon);
+    const dLat = b.lat - a.lat;
+    const dLon = wrappedBLon - a.lon;
+    const legNorm = Math.hypot(dLat, dLon) || 1;
+    const midLat = (a.lat + b.lat) / 2;
+    const midLon = normalizeLon((a.lon + wrappedBLon) / 2);
+
+    const perpLat = dLon / legNorm;
+    const perpLon = -dLat / legNorm;
+    const fwdLat = dLat / legNorm;
+    const fwdLon = dLon / legNorm;
+
+    const offset = baseMargin + (attemptIndex * 1.4);
+    const drift = Math.max(0.8, offset * 0.6);
+
+    const rawCandidates = [
+      { lat: midLat + perpLat * offset, lon: midLon + perpLon * offset },
+      { lat: midLat - perpLat * offset, lon: midLon - perpLon * offset },
+      { lat: midLat + perpLat * offset + fwdLat * drift, lon: midLon + perpLon * offset + fwdLon * drift },
+      { lat: midLat + perpLat * offset - fwdLat * drift, lon: midLon + perpLon * offset - fwdLon * drift },
+      { lat: midLat - perpLat * offset + fwdLat * drift, lon: midLon - perpLon * offset + fwdLon * drift },
+      { lat: midLat - perpLat * offset - fwdLat * drift, lon: midLon - perpLon * offset - fwdLon * drift },
+      { lat: midLat + offset, lon: midLon },
+      { lat: midLat - offset, lon: midLon },
+      { lat: midLat, lon: midLon + offset },
+      { lat: midLat, lon: midLon - offset },
+    ];
+
+    let best = null;
+    let bestCost = Infinity;
+
+    for (const rawCandidate of rawCandidates) {
+      const candidate = normalizeCandidate(rawCandidate);
+      if (!isNavigableLeg(a, candidate) || !isNavigableLeg(candidate, b)) {
+        continue;
+      }
+
+      const cost = scoreDetour(a, candidate, b);
+      if (cost < bestCost) {
+        best = candidate;
+        bestCost = cost;
+      }
+    }
+
+    return best;
+  }
+
+  const route = [start, end];
+
+  for (let insertion = 0; insertion < maxInsertions; insertion += 1) {
+    let blockingLeg = null;
+
+    for (let i = 0; i < route.length - 1 && !blockingLeg; i += 1) {
+      const a = route[i];
+      const b = route[i + 1];
+      const blocker = segmentBlockedByObstacle(a, b);
+      if (blocker) {
+        blockingLeg = { legIndex: i, startPoint: a, endPoint: b, blocker };
+      }
+    }
+
+    if (!blockingLeg) {
+      break;
+    }
+
+    let detour = null;
+    for (let attempt = 0; attempt < 24 && !detour; attempt += 1) {
+      const attemptIndex = insertion + attempt;
+      if (
+        blockingLeg.blocker.kind === 'zone' ||
+        blockingLeg.blocker.kind === 'canal-closed' ||
+        blockingLeg.blocker.kind === 'canal-restricted' ||
+        (blockingLeg.blocker.kind === 'land' && blockingLeg.blocker.geometry)
+      ) {
+        detour = findBestDetourAroundGeometry(
+          blockingLeg.startPoint,
+          blockingLeg.endPoint,
+          blockingLeg.blocker.geometry,
+          attemptIndex,
+        );
+      } else {
+        detour = findOpenWaterDetour(
+          blockingLeg.startPoint,
+          blockingLeg.endPoint,
+          attemptIndex,
+        );
+      }
+    }
+
+    if (!detour) {
+      if (blockingLeg.blocker.kind === 'canal-restricted') {
+        throw new Error(`Selected vessel is not allowed through ${blockingLeg.blocker.name}.`);
+      }
+      throw new Error('No safe marine detour found around land or restricted zones.');
+    }
+
+    route.splice(blockingLeg.legIndex + 1, 0, detour);
+  }
+
+  if (routeHasBlockedLeg(route)) {
+    throw new Error('Computed route still intersects land.');
+  }
+
+  return route;
+}
+
+async function calculateApiGraphRoute(start, end, vessel) {
+  const resp = await fetch('/api/v1/routes/calculate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      company_id: '000000000000000000000001',
+      vessel_id: vessel || '000000000000000000000001',
+      start_node_id: start,
+      end_node_id: end,
+      optimization_mode: currentStrategy,
+    }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.detail || 'Graph route not found');
+  }
+
+  return resp.json();
+}
+
+async function calculateGeodesicRoute(startText, endText, vesselId = '') {
+  const hasLandMask = await ensureLandGeometriesLoaded();
+  if (!hasLandMask) {
+    throw new Error('Cannot calculate sea-safe route right now (land mask unavailable).');
+  }
+
+  const [start, end] = await Promise.all([resolvePlace(startText), resolvePlace(endText)]);
+  const roughStart = { ...start, lon: normalizeLon(start.lon) };
+  const roughEnd = { ...end, lon: wrapLonNear(end.lon, roughStart.lon) };
+
+  const startPoint = findNearestWaterPoint(roughStart, roughEnd);
+  const endPoint = findNearestWaterPoint(roughEnd, startPoint);
+
+  if (pointIsOnLand(startPoint) || pointIsOnLand(endPoint)) {
+    throw new Error('Could not resolve coastal start/end points. Try port coordinates instead.');
+  }
+
+  const vessel = getVesselById(vesselId);
+  let routeWaypoints;
+  try {
+    routeWaypoints = buildZoneAwareWaypoints(startPoint, endPoint, currentStrategy, vessel);
+  } catch {
+    // Zone-aware routing failed — fall back to recursive subdivision
+    try {
+      routeWaypoints = subdivideAroundLand(startPoint, endPoint, 0);
+    } catch {
+      console.warn('Subdivision fallback failed; using direct geodesic fallback.');
+      routeWaypoints = [startPoint, endPoint];
+    }
+  }
+
+  if (!Array.isArray(routeWaypoints) || routeWaypoints.length < 2) {
+    routeWaypoints = [startPoint, endPoint];
+  }
+
+  // Safety net: subdivide any remaining land-crossing sub-legs
+  const safeWaypoints = [routeWaypoints[0]];
+  for (let i = 1; i < routeWaypoints.length; i++) {
+    const a = safeWaypoints[safeWaypoints.length - 1];
+    const b = routeWaypoints[i];
+    if (segmentIntersectsLand(a, b)) {
+      try {
+        const fixed = subdivideAroundLand(a, b, 0);
+        safeWaypoints.push(...fixed.slice(1));
+      } catch {
+        console.warn('Leg subdivision failed; preserving direct segment as last resort.');
+        safeWaypoints.push(b);
+      }
+    } else {
+      safeWaypoints.push(b);
+    }
+  }
+
+  const geodesicPath = buildGeodesicPath(safeWaypoints);
+  const waypoints = geodesicPath.map((p, idx) => ({
+    sequence: idx,
+    coordinates: [p.lon, p.lat],
+    point_type: 'waypoint',
+  }));
+
+  return {
+    _id: 'geodesic-preview',
+    waypoints,
+    route_mode: 'geodesic',
+    from_label: start.name,
+    to_label: end.name,
+    logical_waypoints: safeWaypoints.length,
+  };
+}
+
+function splitRouteSegments(coords) {
+  if (!coords.length) return [];
+
+  const segments = [];
+  let currentSegment = [coords[0]];
+
+  for (let i = 1; i < coords.length; i += 1) {
+    const prev = currentSegment[currentSegment.length - 1];
+    const next = coords[i];
+
+    if (Math.abs(next[1] - prev[1]) > 180) {
+      if (currentSegment.length > 1) segments.push(currentSegment);
+      currentSegment = [next];
+    } else {
+      currentSegment.push(next);
+    }
+  }
+
+  if (currentSegment.length > 1) segments.push(currentSegment);
+  return segments;
+}
+
+/**
+ * Recursively subdivides a leg that crosses land until every sub-segment
+ * stays over water. At each level, the midpoint of the blocked segment is
+ * computed on the great circle and, if it falls on land, pushed to the
+ * nearest water point (perpendicular to the leg direction first, then
+ * radial search). The two resulting sub-legs are then checked recursively.
+ *
+ * Max depth of 8 gives up to 256 sub-segments — fine-grained enough to
+ * trace any coastline.
+ */
+function subdivideAroundLand(a, b, depth) {
+  const MAX_DEPTH = 8;
+  if (depth >= MAX_DEPTH) return [a, b];
+  if (!segmentIntersectsLand(a, b)) return [a, b];
+
+  // Find the midpoint on the great circle
+  const mid = interpolateGreatCircle(a, b, 0.5);
+  let waterMid = { lat: mid.lat, lon: normalizeLon(mid.lon) };
+
+  if (pointIsOnLand(waterMid)) {
+    // Push perpendicular to the leg direction first (faster than radial)
+    const legBearing = bearingBetween(a, b);
+    const perpR = (legBearing + 90) % 360;
+    const perpL = (legBearing + 270) % 360;
+    let found = false;
+
+    for (let km = 5; km <= 250; km += 5) {
+      const cR = offsetPointByKm(waterMid, perpR, km);
+      if (!pointIsOnLand(cR)) { waterMid = cR; found = true; break; }
+      const cL = offsetPointByKm(waterMid, perpL, km);
+      if (!pointIsOnLand(cL)) { waterMid = cL; found = true; break; }
+    }
+
+    // Fallback: full radial search biased toward destination
+    if (!found) {
+      waterMid = findNearestWaterPoint(mid, b);
+    }
+  }
+
+  const firstHalf  = subdivideAroundLand(a, waterMid, depth + 1);
+  const secondHalf = subdivideAroundLand(waterMid, b, depth + 1);
+  return [...firstHalf, ...secondHalf.slice(1)];
+}
+
+/**
+ * Takes a graph-based route (sequence of port/waypoint coordinates from the
+ * backend) and re-routes each leg through the frontend's water-avoidance
+ * system so the final rendered path stays 100 % over water.
+ *
+ * Strategy:
+ *   1. Try the full zone-aware detour system (handles zones + land).
+ *   2. If that throws, fall back to recursive subdivision which handles
+ *      any size of land mass reliably.
+ *   3. As a final safety net, run subdivision over every sub-leg produced
+ *      by step 1/2 to catch any remaining land crossings.
+ */
+async function ensureRouteOverWater(route, vesselId) {
+  const hasLandMask = await ensureLandGeometriesLoaded();
+  if (!hasLandMask) {
+    console.warn('Land mask unavailable — graph route displayed as-is');
+    return false;
+  }
+
+  const wps = (route.waypoints || []).sort((a, b) => a.sequence - b.sequence);
+  if (wps.length < 2) return false;
+
+  const originalWaypoints = JSON.parse(JSON.stringify(route.waypoints || []));
+
+  const vessel = getVesselById(vesselId);
+  const routePoints = wps
+    .map((wp) => ({ lat: wp.coordinates?.[1], lon: wp.coordinates?.[0] }))
+    .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon));
+
+  const navigablePoints = routePoints.map((point, idx) => {
+    const toward = routePoints[idx + 1] || routePoints[idx - 1] || null;
+    return findNearestWaterPoint(
+      { lat: point.lat, lon: normalizeLon(point.lon) },
+      toward ? { lat: toward.lat, lon: normalizeLon(toward.lon) } : null,
+    );
+  });
+
+  const allRefinedPoints = [];
+
+  for (let i = 0; i < navigablePoints.length - 1; i++) {
+    const p1 = navigablePoints[i];
+    const p2 = navigablePoints[i + 1];
+
+    let legCrossesLand = false;
+    try { legCrossesLand = segmentIntersectsLand(p1, p2); } catch { /* safe */ }
+
+    if (!legCrossesLand) {
+      const legPath = buildGeodesicPath([p1, p2]);
+      allRefinedPoints.push(...(i === 0 ? legPath : legPath.slice(1)));
+      continue;
+    }
+
+    let legWaypoints;
+    try {
+      legWaypoints = buildZoneAwareWaypoints(p1, p2, currentStrategy, vessel);
+    } catch {
+      legWaypoints = subdivideAroundLand(p1, p2, 0);
+    }
+
+    const safeLeg = [legWaypoints[0]];
+    for (let j = 1; j < legWaypoints.length; j++) {
+      const subA = safeLeg[safeLeg.length - 1];
+      const subB = legWaypoints[j];
+      if (segmentIntersectsLand(subA, subB)) {
+        const fixed = subdivideAroundLand(subA, subB, 0);
+        safeLeg.push(...fixed.slice(1));
+      } else {
+        safeLeg.push(subB);
+      }
+    }
+
+    const legPath = buildGeodesicPath(safeLeg);
+    allRefinedPoints.push(...(i === 0 ? legPath : legPath.slice(1)));
+  }
+
+  // Replace the route's waypoints with the refined water-only points
+  route.waypoints = allRefinedPoints.map((p, idx) => ({
+    sequence: idx,
+    coordinates: [p.lon, p.lat],
+    point_type: 'waypoint',
+  }));
+
+  const nearestRoutePointIndex = (target) => {
+    let bestIdx = -1;
+    let bestDistanceKm = Infinity;
+
+    route.waypoints.forEach((wp, idx) => {
+      const point = { lat: wp.coordinates[1], lon: wp.coordinates[0] };
+      const d = haversineKm(target, point);
+      if (d < bestDistanceKm) {
+        bestDistanceKm = d;
+        bestIdx = idx;
+      }
+    });
+
+    return bestDistanceKm <= 200 ? bestIdx : -1;
+  };
+
+  wps.forEach(originalWp => {
+    if (originalWp.point_type === 'port' || originalWp.name) {
+      const matchIdx = nearestRoutePointIndex({
+        lat: originalWp.coordinates[1],
+        lon: originalWp.coordinates[0],
+      });
+      if (matchIdx !== -1) {
+        route.waypoints[matchIdx].point_type = originalWp.point_type;
+        route.waypoints[matchIdx].name = originalWp.name;
+      }
+    }
+  });
+
+  if (routePayloadIntersectsLand(route)) {
+    console.warn('Refined route still intersects land; falling back to backend graph route.');
+    route.waypoints = originalWaypoints;
+    return false;
+  }
+
+  return true;
+}
+
+async function calculateRoute() {
+  const start = document.getElementById('startNode').value.trim();
+  const end = document.getElementById('endNode').value.trim();
+  const vessel = selectedRouteVesselId || document.getElementById('vesselSelect').value;
+  if (!start || !end) { notify('Enter origin and destination','err'); return; }
+  const btn = document.getElementById('calcBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Calculating...';
+  setLoading(true, `Running ${currentStrategy} strategy...`);
+  try {
+    currentRouteRequest = { start, end, vessel };
+    let route;
+    let graphMode = false;
+
+    try {
+      route = await calculateApiGraphRoute(start, end, vessel);
+      route.route_mode = 'graph';
+      graphMode = true;
+      await ensureRouteOverWater(route, vessel);
+    } catch (graphErr) {
+      console.log('Graph route failed, trying geodesic:', graphErr.message);
+
+      route = await calculateGeodesicRoute(start, end, vessel);
+      if (!graphMode && routePayloadIntersectsLand(route)) {
+        console.warn('Geodesic fallback intersects land; rendering fallback route to avoid hard failure.');
+      }
+    }
+
+    displayRoute(route);
+    notify(`Route calculated — ${route.waypoints?.length||0} points ✓`);
+  } catch(e) {
+    notify(e.message||'Calculation failed','err');
+  } finally {
+    btn.disabled=false;
+    btn.innerHTML='Calculate Route';
+    setLoading(false);
+  }
+}
+
+async function refreshCurrentRouteIfNeeded() {
+  if (!currentRouteRequest) return;
+  if (!routeLayer || routeLayer.getLayers().length === 0) return;
+
+  const { start, end, vessel } = currentRouteRequest;
+  try {
+    let route;
+    if (isGraphNodeId(start) && isGraphNodeId(end)) {
+      route = await calculateApiGraphRoute(start, end, vessel);
+      route.route_mode = 'graph';
+      await ensureRouteOverWater(route, vessel);
+    } else {
+      route = await calculateGeodesicRoute(start, end, vessel);
+      if (routePayloadIntersectsLand(route)) {
+        console.warn('Refreshed geodesic route intersects land; rendering fallback route.');
+      }
+    }
+
+    displayRoute(route);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function displayRoute(route) {
+  routeLayer.clearLayers();
+  const wps = (route.waypoints||[]).sort((a,b)=>a.sequence-b.sequence);
+  if (!wps.length) return;
+  const coords = wps.map(w => [w.coordinates[1], w.coordinates[0]]);
+  const segments = splitRouteSegments(coords);
+  const allCoords = [];
+
+  segments.forEach(segment => {
+    allCoords.push(...segment);
+    L.polyline(segment, {
+      pane:'routePane',
+      color:'#38bdf8',
+      weight:3.5,
+      opacity:0.95,
+      lineJoin:'round',
+      lineCap:'round'
+    }).addTo(routeLayer);
+  });
+
+  L.circleMarker(coords[0],{pane:'routePane',radius:8,fillColor:'#22c55e',color:'#fff',weight:2,fillOpacity:1}).bindPopup(`<b>Origin</b>`).addTo(routeLayer);
+  L.circleMarker(coords[coords.length-1],{pane:'routePane',radius:8,fillColor:'#f43f5e',color:'#fff',weight:2,fillOpacity:1}).bindPopup(`<b>Destination</b>`).addTo(routeLayer);
+  // Only draw markers for named port waypoints, not every interpolation point
+  wps.slice(1,-1).forEach((w, idx) => {
+    if (w.point_type === 'port' && w.name) {
+      const c = [w.coordinates[1], w.coordinates[0]];
+      L.circleMarker(c,{pane:'routePane',radius:4,fillColor:'#38bdf8',color:'#07111f',weight:1.5,fillOpacity:0.8})
+        .bindPopup(`<b>${w.name}</b>`)
+        .addTo(routeLayer);
+    }
+  });
+
+  if (allCoords.length) {
+    map.fitBounds(L.latLngBounds(allCoords),{padding:[60,60],maxZoom:8});
+  }
+  const res = document.getElementById('routeResult'); res.style.display='flex';
+  const logicalWaypoints = route.logical_waypoints || wps.length;
+  document.getElementById('res-waypoints').textContent = logicalWaypoints;
+
+  const distNm = route.total_distance_nm;
+  document.getElementById('res-distance').textContent = distNm != null ? `${distNm.toLocaleString()} NM` : '—';
+
+  const durH = route.estimated_duration_h;
+  if (durH != null) {
+    const days = Math.floor(durH / 24);
+    const hrs = Math.round(durH % 24);
+    document.getElementById('res-duration').textContent = days > 0 ? `${days}d ${hrs}h` : `${hrs}h`;
+  } else {
+    document.getElementById('res-duration').textContent = '—';
+  }
+
+  const fuel = route.estimated_fuel_tons;
+  document.getElementById('res-fuel').textContent = fuel != null ? `${fuel.toLocaleString()} t` : '—';
+
+  const vt = route.vessel_type_used;
+  document.getElementById('res-vessel-type').textContent = vt ? vt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Default';
+
+  const modeLabel = route.route_mode === 'graph' ? 'graph' : 'geodesic';
+  document.getElementById('res-strategy').textContent = `${currentStrategy} (${modeLabel})`;
+  document.getElementById('res-id').textContent = route._id?.$oid||route._id||'—';
+}
+
+function clearRoute() { routeLayer.clearLayers(); document.getElementById('routeResult').style.display='none'; }
+
+initMap();
+routeRefreshTimer = setInterval(() => {
+  loadZones();
+}, 30000);
+</script>
+</body>
+</html>

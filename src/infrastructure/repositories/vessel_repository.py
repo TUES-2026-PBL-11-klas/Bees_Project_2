@@ -11,9 +11,7 @@ class VesselRepository:
         return vessel
 
     def get_by_id(self, vessel_id: str) -> Optional[Vessel]:
-        if not ObjectId.is_valid(vessel_id):
-            return None
-        return Vessel.objects(id=ObjectId(vessel_id)).first()
+        return Vessel.objects(id=vessel_id).first()
 
     def get_all(self) -> list[Vessel]:
         return list(Vessel.objects.all())

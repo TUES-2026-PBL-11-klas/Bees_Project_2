@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clearwake-config
+data:
+  APP_NAME: "ClearWake Routing API"
+  LOG_LEVEL: "INFO"
+  MAP_PROVIDER: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"

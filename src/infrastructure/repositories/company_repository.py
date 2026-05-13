@@ -1,7 +1,5 @@
 from typing import Optional
 
-from bson import ObjectId
-
 from src.models.company import Company
 
 
@@ -11,9 +9,7 @@ class CompanyRepository:
         return company
 
     def get_by_id(self, company_id: str) -> Optional[Company]:
-        if not ObjectId.is_valid(company_id):
-            return None
-        return Company.objects(id=ObjectId(company_id)).first()
+        return Company.objects(id=company_id).first()
 
     def get_all(self) -> list[Company]:
         return list(Company.objects.all())

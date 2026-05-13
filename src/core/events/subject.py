@@ -18,9 +18,14 @@ class ZoneSubject:
             self._observers.remove(observer)
 
     def notify(self):
-        from src.core.events.dispatcher import dispatch_notification
-        for observer in self._observers:
-            dispatch_notification(observer, self.zone_id, self.status)
+        from src.core.events.dispatcher import dispatcher
+        from src.core.events.event import Event
+
+        event = Event(
+            event_type="ZONE_STATUS_CHANGED",
+            data={"zone_id": self.zone_id, "status": self.status}
+        )
+        dispatcher.dispatch(event)
 
     def set_status(self, new_status: str):
         with self._lock:
