@@ -22,3 +22,26 @@ class Route(me.Document):
         "collection": "routes",
         "indexes": ["request_id", "company_id", "vessel_id"]
     }
+
+class RouteHistory(me.Document):
+    origin = me.StringField(required=True)
+    destination = me.StringField(required=True)
+    vessel_type = me.StringField(required=True)
+    optimization_mode = me.StringField(choices=["fastest", "eco"], required=True)
+    strategy = me.StringField(required=True)
+    calculated_time_h = me.FloatField(required=True)
+    predicted_fuel_tons = me.FloatField(required=True)
+    actual_time_h = me.FloatField(null=True)
+    actual_fuel_tons = me.FloatField(null=True)
+    calculated_at = me.DateTimeField(default=datetime.utcnow)
+    route_id = me.ObjectIdField(null=True)
+
+    meta = {
+        "collection": "route_history",
+        "indexes": [
+            "origin",
+            "destination",
+            "vessel_type",
+            "optimization_mode"
+        ]
+    }
