@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     RATE_LIMIT_REQUESTS_PER_MINUTE: int = 60
     LOG_LEVEL: str = "info"
     MAP_PROVIDER: str = "carto-voyager"
+    WEATHER_API_KEY: Optional[str] = None
+    WEATHER_API_BASE_URL: str = "https://api.openweathermap.org/data/2.5"
+    WEATHER_CACHE_TTL_SECONDS: int = 600
+    WEATHER_MAP_MAX_GRID_POINTS: int = 64
+    WEATHER_HTTP_TIMEOUT_SECONDS: float = 10.0
 
     class Config:
         env_file = ".env"

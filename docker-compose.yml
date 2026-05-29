@@ -8,6 +8,8 @@ services:
       - DB_NAME=${DB_NAME:-clearwake}
       - APP_ENV=${APP_ENV:-development}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - WEATHER_API_KEY=${WEATHER_API_KEY:-}
+      - WEATHER_CACHE_TTL_SECONDS=${WEATHER_CACHE_TTL_SECONDS:-600}
     depends_on:
       mongo:
         condition: service_healthy
