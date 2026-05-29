@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from src.api.errors import APIError
 from src.api.router import router as api_router
+from src.api.v1.routers.weather import close_weather_service
 from src.core.config import settings
 from src.infrastructure.database.database import close_db, init_db
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -18,6 +19,7 @@ logging.basicConfig(level=settings.LOG_LEVEL.upper())
 async def lifespan(app: FastAPI):
     init_db()
     yield
+    await close_weather_service()
     close_db()
 
 app = FastAPI(title="ClearWake Routing", lifespan=lifespan)
