@@ -164,6 +164,7 @@ class NavigationGraph:
         self,
         origin_id: str,
         destination_id: str,
+        edge_filter=None,
     ) -> Optional[list[Waypoint]]:
         """
         Find the shortest unblocked path between two waypoints using A*.
@@ -208,6 +209,8 @@ class NavigationGraph:
 
             for edge in self._adjacency.get(current_id, []):
                 if edge.is_blocked:
+                    continue
+                if edge_filter is not None and not edge_filter(edge):
                     continue
 
                 neighbour_id = edge.destination.node_id

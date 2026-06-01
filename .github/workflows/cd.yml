@@ -31,33 +31,34 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set lowercase owner and repository
+        id: repo_meta
         run: |
-          echo "OWNER=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-          echo "REPOSITORY=$(echo ${{ github.event.repository.name }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          echo "owner=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+          echo "repository=$(echo ${{ github.event.repository.name }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ env.OWNER }}/${{ env.REPOSITORY }}:${{ github.sha }}
+          tags: ghcr.io/${{ steps.repo_meta.outputs.owner }}/${{ steps.repo_meta.outputs.repository }}:${{ github.sha }}
 
       - name: Update Kubernetes Deployment with new image tag
         run: |
-          sed -i "s|^\(\s*image:\s*\).*|\1ghcr.io/${{ env.OWNER }}/${{ env.REPOSITORY }}:${{ github.sha }}|g" deploy/kubernetes/deployment.yaml
+          sed -i "s|^\(\s*image:\s*\).*|\1ghcr.io/${{ steps.repo_meta.outputs.owner }}/${{ steps.repo_meta.outputs.repository }}:${{ github.sha }}|g" deploy/kubernetes/deployment.yaml
 
       - name: Create Pull Request for deployment image update
         id: create_pr
         continue-on-error: true
         uses: peter-evans/create-pull-request@v7
         with:
-          token: ${{ secrets.CI_REPO_PAT != '' && secrets.CI_REPO_PAT || github.token }}
+          token: ${{ github.token }}
           commit-message: "chore: update image tag to ${{ github.sha }} [skip ci]"
           title: "chore: update image tag to ${{ github.sha }}"
           body: |
             Automated update of Kubernetes deployment image tag.
 
-            - Image: `ghcr.io/${{ env.OWNER }}/${{ env.REPOSITORY }}:${{ github.sha }}`
+            - Image: `ghcr.io/${{ steps.repo_meta.outputs.owner }}/${{ steps.repo_meta.outputs.repository }}:${{ github.sha }}`
             - Source commit: `${{ github.sha }}`
           branch: "ci/update-image-${{ github.sha }}"
           delete-branch: true
@@ -68,4 +69,4 @@ jobs:
         if: steps.create_pr.outcome != 'success'
         run: |
           echo "create-pull-request could not open/update a PR with current token/policies."
-          echo "Set secret CI_REPO_PAT (repo scope) or enable Actions to create PRs in repository settings."
+          echo "The built-in GITHUB_TOKEN is sufficient if repository Actions permissions allow PR creation."

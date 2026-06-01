@@ -1,7 +1,12 @@
+import asyncio
+import logging
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from src.infrastructure.repositories.audit_log_repository import AuditLogRepository
+
+logger = logging.getLogger(__name__)
+
 
 class EventDispatcher:
     def __init__(self):
@@ -9,6 +14,11 @@ class EventDispatcher:
         self._lock = Lock()
         self._audit_repo = AuditLogRepository()
         self._executor = ThreadPoolExecutor(max_workers=5)
+        self._ws_manager = None
+
+    def set_ws_manager(self, ws_manager):
+        """Attach a WebSocketManager for real-time event broadcasting."""
+        self._ws_manager = ws_manager
 
     def subscribe(self, event_type: str, observer):
         with self._lock:
@@ -32,5 +42,19 @@ class EventDispatcher:
 
         for observer in observers:
             self._executor.submit(observer.update, event)
+
+        # Push to WebSocket if manager is attached
+        if self._ws_manager:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(
+                        self._ws_manager.broadcast({
+                            "event_type": event.event_type,
+                            "payload": event.data,
+                        })
+                    )
+            except RuntimeError:
+                pass  # No event loop running (e.g., in tests)
 
 dispatcher = EventDispatcher()
