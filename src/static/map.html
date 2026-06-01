@@ -423,6 +423,7 @@ async function initMap() {
     center: [20, 30], zoom: 3, minZoom: 2, maxZoom: 18,
     worldCopyJump: true,
     zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 80,
+    preferCanvas: true,
   });
 
   ['landPane','lakePane','zonePane','routePane','vesselPane','labelPane'].forEach((p,i) => {
@@ -504,6 +505,8 @@ async function initMap() {
       pane:'landPane',
       style: landMaskStyleFor(preferredBaseLayerName),
       interactive:false,
+      smoothFactor: 2.0,
+      renderer: L.canvas({ padding: 0.3 }),
     }).addTo(map);
   }
   if (!landGeometries.length) {
@@ -514,6 +517,8 @@ async function initMap() {
       pane:'lakePane',
       style: lakeMaskStyleFor(preferredBaseLayerName),
       interactive:false,
+      smoothFactor: 2.0,
+      renderer: L.canvas({ padding: 0.3 }),
     }).addTo(map);
   }
   applyMaskStyle(preferredBaseLayerName);
@@ -564,10 +569,12 @@ async function initMap() {
   });
 
   map.on('zoom', () => setStatus(`Zoom: ${map.getZoom().toFixed(1)}`));
+  let _moveEndRaf = null;
   map.on('moveend', () => {
-    if (zonesVisible) {
-      renderZonesOnMap();
-    }
+    if (_moveEndRaf) cancelAnimationFrame(_moveEndRaf);
+    _moveEndRaf = requestAnimationFrame(() => {
+      if (zonesVisible) renderZonesOnMap();
+    });
   });
   setStatus('Ready');
   await loadVesselTypes();
@@ -1205,7 +1212,12 @@ function interpolateGreatCircle(a, b, fraction) {
   return { lat: toDegrees(lat), lon: normalizeLon(toDegrees(lon)) };
 }
 
-function buildGreatCircleLeg(a, b, steps = 96) {
+function buildGreatCircleLeg(a, b, steps) {
+  // Adaptive step count: short legs get fewer points for better performance
+  if (steps === undefined) {
+    const distKm = haversineKm(a, b);
+    steps = distKm < 100 ? 8 : distKm < 500 ? 16 : distKm < 2000 ? 32 : 48;
+  }
   const points = [];
   for (let i = 0; i <= steps; i += 1) {
     points.push(interpolateGreatCircle(a, b, i / steps));
@@ -1298,6 +1310,13 @@ function segmentIntersectsLand(start, end) {
       const lineLengthKm = turf.length(line, { units: 'kilometers' });
       if (!Number.isFinite(lineLengthKm) || lineLengthKm <= 0.2) {
         return false;
+      }
+
+      // Short coastal legs: if it intersects land at all, treat as blocked.
+      // The sample-based check below can miss narrow coastal crossings
+      // (e.g. Varna→Burgas clipping the Bulgarian coast).
+      if (lineLengthKm < 300) {
+        return true;
       }
 
       const sampleFractions = [0.2, 0.35, 0.5, 0.65, 0.8];
@@ -1915,7 +1934,9 @@ function splitRouteSegments(coords) {
  * trace any coastline.
  */
 function subdivideAroundLand(a, b, depth) {
-  const MAX_DEPTH = 8;
+  // Short legs need fewer subdivisions (smoother curve, fewer points)
+  const legKm = haversineKm(a, b);
+  const MAX_DEPTH = legKm < 200 ? 4 : legKm < 500 ? 6 : 8;
   if (depth >= MAX_DEPTH) return [a, b];
   if (!segmentIntersectsLand(a, b)) return [a, b];
 
@@ -1990,7 +2011,6 @@ async function ensureRouteOverWater(route, vesselId) {
   for (let i = 0; i < navigablePoints.length - 1; i++) {
     const p1 = navigablePoints[i];
     const p2 = navigablePoints[i + 1];
-
     let legCrossesLand = false;
     try { legCrossesLand = segmentIntersectsLand(p1, p2); } catch { /* safe */ }
 

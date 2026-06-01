@@ -7,7 +7,10 @@ from fastapi.staticfiles import StaticFiles
 
 from src.api.errors import APIError
 from src.api.router import router as api_router
+from src.api.v1.routers.ai import ws_notifications, ws_manager
 from src.core.config import settings
+from src.core.events.ai_observer import register_ai_observer
+from src.core.events.dispatcher import dispatcher
 from src.infrastructure.database.database import close_db, init_db
 from prometheus_fastapi_instrumentator import Instrumentator
 
@@ -17,6 +20,9 @@ logging.basicConfig(level=settings.LOG_LEVEL.upper())
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    register_ai_observer()
+    dispatcher.set_ws_manager(ws_manager)
+    logger.info("AI module initialised (observer + WebSocket manager)")
     yield
     close_db()
 
@@ -24,8 +30,10 @@ app = FastAPI(title="ClearWake Routing", lifespan=lifespan)
 
 app.include_router(api_router)
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
+app.add_api_websocket_route("/ws/ai/notifications", ws_notifications)
 
 Instrumentator().instrument(app).expose(app)
+
 
 @app.get("/", include_in_schema=False)
 async def root():
