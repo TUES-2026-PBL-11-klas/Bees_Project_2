@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     AI_WEATHER_FACTOR_SUMMER: float = 1.0
     AI_WEATHER_FACTOR_WINTER: float = 1.15
 
+    # JWT auth — change JWT_SECRET in production.
+    JWT_SECRET: str = "dev-only-secret-change-me"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRES_MINUTES: int = 60
+
     class Config:
         env_file = ".env"
         extra = "ignore"

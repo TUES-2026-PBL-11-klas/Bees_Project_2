@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from src.api.v1.routers import (
     analytics,
+    auth,
     billing_data,
     companies,
     fleet,
@@ -16,6 +17,7 @@ from src.api.v1.routers import (
 from src.api.v1.routers import ai as ai_router
 
 router = APIRouter()
+router.include_router(auth.router)
 router.include_router(routes.router)
 router.include_router(routing.router)
 router.include_router(vessels.router)

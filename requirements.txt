@@ -18,3 +18,5 @@ mongoengine
 pymongo
 
 prometheus-fastapi-instrumentator
+
+PyJWT
