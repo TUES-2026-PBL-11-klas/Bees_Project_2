@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: clearwake/api:latest
+          image: ghcr.io/tues-2026-pbl-11-klas/bees_project_2:1c0b7ef00254b9fad13361f92412950998f930f8
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
