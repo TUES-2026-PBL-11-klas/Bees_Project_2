@@ -23,6 +23,10 @@ from src.infrastructure.repositories.route_repository import RouteRepository
 from src.infrastructure.repositories.route_history_repository import RouteHistoryRepository
 from src.core.graph_builder import build_navigation_graph
 from src.core.ports import resolve_port, list_all_ports
+from src.core.services.draft_trim_optimizer import (
+    DraftTrimInput,
+    optimize as optimize_draft_trim,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +146,10 @@ def _build_vessel_constraints(
                     fuel_multiplier=_FUEL_MULTIPLIERS.get(vt, 1.0) if vt else 1.0,
                     length_m=float(specs.length_m) if specs and specs.length_m else None,
                     beam_m=float(specs.beam_m) if specs and specs.beam_m else None,
+                    max_cargo_t=float(specs.max_cargo_t) if specs and specs.max_cargo_t else None,
+                    cargo_weight_t=float(specs.cargo_weight_t) if specs and specs.cargo_weight_t is not None else None,
+                    trim_m=float(specs.trim_m) if specs and specs.trim_m is not None else None,
+                    hydro_resistance_coef=float(specs.hydro_resistance_coef) if specs and specs.hydro_resistance_coef else None,
                 )
         except Exception as exc:
             logger.debug("Could not load vessel %s from DB: %s", vessel_id, exc)
@@ -156,13 +164,51 @@ def _build_vessel_constraints(
     return None
 
 
+def _draft_trim_savings(
+    vessel: Optional[VesselConstraints],
+    wave_height_m: float = 0.0,
+) -> Optional[dict]:
+    """
+    Run the draft/trim optimizer when the vessel has enough loading data.
+
+    Returns the optimiser result as a dict (including ``fuel_savings_pct``),
+    or ``None`` when any required field is missing.
+    """
+    if vessel is None:
+        return None
+    required = (vessel.length_m, vessel.beam_m, vessel.max_draft_m,
+                vessel.max_speed_knots, vessel.max_cargo_t, vessel.cargo_weight_t)
+    if any(v is None for v in required):
+        return None
+    try:
+        result = optimize_draft_trim(
+            DraftTrimInput(
+                length_m=vessel.length_m,
+                beam_m=vessel.beam_m,
+                max_draft_m=vessel.max_draft_m,
+                speed_knots=vessel.max_speed_knots,
+                cargo_weight_t=vessel.cargo_weight_t,
+                max_cargo_t=vessel.max_cargo_t,
+                wave_height_m=wave_height_m,
+            )
+        )
+    except ValueError:
+        return None
+    return result.as_dict()
+
+
 def _compute_route_stats(
     waypoints,
     vessel: Optional[VesselConstraints] = None,
+    wave_height_m: float = 0.0,
 ) -> dict:
     """
     Compute total distance (NM), duration (hours), and fuel (tonnes)
     from an ordered list of graph Waypoint objects.
+
+    When the vessel has cargo + dimensions, the draft/trim optimiser is run
+    and its fuel savings reduce ``estimated_fuel_tons``. The hull
+    ``hydro_resistance_coef`` (if set) multiplies the base fuel burn.
     """
     total_metres = 0.0
     for i in range(len(waypoints) - 1):
@@ -173,6 +219,7 @@ def _compute_route_stats(
     speed = DEFAULT_SPEED_KNOTS
     fuel_rate = DEFAULT_FUEL_RATE
     fuel_mult = 1.0
+    hydro_mult = 1.0
 
     if vessel:
         if vessel.max_speed_knots:
@@ -180,15 +227,28 @@ def _compute_route_stats(
         if vessel.fuel_consumption_rate:
             fuel_rate = vessel.fuel_consumption_rate
         fuel_mult = vessel.fuel_multiplier
+        if vessel.hydro_resistance_coef:
+            hydro_mult = vessel.hydro_resistance_coef
 
     duration_h = total_nm / speed if speed > 0 else 0.0
-    fuel_tons = fuel_rate * total_nm * fuel_mult
+    base_fuel_tons = fuel_rate * total_nm * fuel_mult * hydro_mult
 
-    return {
+    optimization = _draft_trim_savings(vessel, wave_height_m=wave_height_m)
+    if optimization:
+        savings_pct = max(0.0, min(15.0, float(optimization.get("fuel_savings_pct", 0.0))))
+        fuel_tons = base_fuel_tons * (1.0 - savings_pct / 100.0)
+    else:
+        fuel_tons = base_fuel_tons
+
+    stats = {
         "total_distance_nm": round(total_nm, 2),
         "estimated_duration_h": round(duration_h, 2),
         "estimated_fuel_tons": round(fuel_tons, 2),
+        "baseline_fuel_tons": round(base_fuel_tons, 2),
     }
+    if optimization:
+        stats["draft_trim_optimization"] = optimization
+    return stats
 
 
 
@@ -315,6 +375,9 @@ def calculate_route(request: RouteCalculationSchema):
     result["total_distance_nm"] = stats["total_distance_nm"]
     result["estimated_duration_h"] = stats["estimated_duration_h"]
     result["estimated_fuel_tons"] = stats["estimated_fuel_tons"]
+    result["baseline_fuel_tons"] = stats.get("baseline_fuel_tons")
+    if "draft_trim_optimization" in stats:
+        result["draft_trim_optimization"] = stats["draft_trim_optimization"]
     result["vessel_type_used"] = vessel.vessel_type if vessel else None
     result["start_port"] = start_id
     result["end_port"] = end_id

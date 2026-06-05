@@ -19,6 +19,10 @@ class VesselConstraints:
         fuel_multiplier:      Type-specific multiplier from the Vessel subclass.
         length_m:             Vessel length (metres) – can restrict canals.
         beam_m:               Vessel beam (metres) – can restrict canals.
+        max_cargo_t:          Design max cargo (tonnes); used by trim optimiser.
+        cargo_weight_t:       Current cargo (tonnes); used by trim optimiser.
+        trim_m:               Current stern-trim (positive) in metres.
+        hydro_resistance_coef: Hull-specific resistance multiplier (≈ 1.0).
     """
     vessel_type: Optional[str] = None
     max_draft_m: Optional[float] = None
@@ -27,6 +31,10 @@ class VesselConstraints:
     fuel_multiplier: float = 1.0
     length_m: Optional[float] = None
     beam_m: Optional[float] = None
+    max_cargo_t: Optional[float] = None
+    cargo_weight_t: Optional[float] = None
+    trim_m: Optional[float] = None
+    hydro_resistance_coef: Optional[float] = None
 
 
 

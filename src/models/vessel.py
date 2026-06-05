@@ -42,6 +42,11 @@ class VesselSpecs(me.EmbeddedDocument):
     max_speed_knots = me.FloatField()
     length_m = me.FloatField()
     beam_m = me.FloatField()
+    # Loading state + hull resistance — feed the draft/trim optimizer (issue #80).
+    max_cargo_t = me.FloatField()
+    cargo_weight_t = me.FloatField()
+    trim_m = me.FloatField()
+    hydro_resistance_coef = me.FloatField()
 
 
 class Vessel(me.Document):

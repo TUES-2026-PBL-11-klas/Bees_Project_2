@@ -69,3 +69,82 @@ def test_savings_is_non_negative():
     """Optimizer can't make things worse than the baseline (zero-trim) case."""
     result = optimize(_base(wave_height_m=2.5))
     assert result.fuel_savings_pct >= 0.0
+
+
+# ---------------------------------------------------------------------------
+# Integration with the routes helper layer
+# ---------------------------------------------------------------------------
+
+
+def test_draft_trim_savings_returns_none_without_cargo_data():
+    from src.api.v1.routers.routes import _draft_trim_savings
+    from src.core.routing.strategy import VesselConstraints
+
+    vessel = VesselConstraints(
+        vessel_type="tanker",
+        length_m=180.0,
+        beam_m=32.0,
+        max_draft_m=12.0,
+        max_speed_knots=14.0,
+        # cargo fields missing → optimiser cannot run
+    )
+    assert _draft_trim_savings(vessel) is None
+
+
+def test_draft_trim_savings_runs_with_full_data():
+    from src.api.v1.routers.routes import _draft_trim_savings
+    from src.core.routing.strategy import VesselConstraints
+
+    vessel = VesselConstraints(
+        vessel_type="tanker",
+        length_m=180.0,
+        beam_m=32.0,
+        max_draft_m=12.0,
+        max_speed_knots=14.0,
+        max_cargo_t=30000.0,
+        cargo_weight_t=15000.0,
+    )
+    result = _draft_trim_savings(vessel, wave_height_m=2.0)
+    assert result is not None
+    assert "fuel_savings_pct" in result
+    assert result["fuel_savings_pct"] >= 0.0
+
+
+def test_compute_route_stats_applies_savings_and_hydro_coef():
+    from types import SimpleNamespace
+
+    from src.api.v1.routers.routes import _compute_route_stats
+    from src.core.routing.strategy import VesselConstraints
+
+    # Fake "waypoints" with a distance_to method — two points ~100 NM apart.
+    p0 = SimpleNamespace(distance_to=lambda other: 185_200.0)  # 100 NM in metres
+    p1 = SimpleNamespace(distance_to=lambda other: 0.0)
+    waypoints = [p0, p1]
+
+    base_vessel = VesselConstraints(
+        vessel_type="tanker",
+        max_speed_knots=14.0,
+        fuel_consumption_rate=0.05,
+        fuel_multiplier=1.2,
+    )
+    base_stats = _compute_route_stats(waypoints, base_vessel)
+    assert "draft_trim_optimization" not in base_stats
+    assert base_stats["baseline_fuel_tons"] == base_stats["estimated_fuel_tons"]
+
+    optimised_vessel = VesselConstraints(
+        vessel_type="tanker",
+        length_m=180.0,
+        beam_m=32.0,
+        max_draft_m=12.0,
+        max_speed_knots=14.0,
+        fuel_consumption_rate=0.05,
+        fuel_multiplier=1.2,
+        max_cargo_t=30000.0,
+        cargo_weight_t=15000.0,
+        hydro_resistance_coef=1.05,
+    )
+    opt_stats = _compute_route_stats(waypoints, optimised_vessel, wave_height_m=2.0)
+    assert "draft_trim_optimization" in opt_stats
+    # Hydro coefficient raises baseline, optimisation should cut it back down.
+    assert opt_stats["baseline_fuel_tons"] > base_stats["baseline_fuel_tons"]
+    assert opt_stats["estimated_fuel_tons"] <= opt_stats["baseline_fuel_tons"]
