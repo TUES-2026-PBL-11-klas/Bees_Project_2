@@ -1,9 +1,9 @@
 global:
   resolve_timeout: 5m
   smtp_smarthost: "smtp.gmail.com:587"
-  smtp_from: "radoslav.s.slavov@gmail.com"
-  smtp_auth_username: "radoslav.s.slavov@gmail.com"
-  smtp_auth_password: "nhjo vapi eady zrmg"
+  smtp_from: "${ALERT_EMAIL}"
+  smtp_auth_username: "${ALERT_EMAIL}"
+  smtp_auth_password: "${SMTP_PASSWORD}"
   smtp_require_tls: true
 
 route:
@@ -15,5 +15,5 @@ route:
 receivers:
   - name: "email-notifications"
     email_configs:
-      - to: "radoslav.s.slavov@gmail.com"
+      - to: "${ALERT_EMAIL}"
         send_resolved: true
