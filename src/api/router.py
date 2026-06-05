@@ -1,8 +1,10 @@
 from fastapi import APIRouter
 from src.api.v1.routers import (
     analytics,
+    billing_data,
     companies,
     fleet,
+    fleet_profiles,
     optimization,
     port_scheduling,
     routes,
@@ -18,7 +20,9 @@ router.include_router(routes.router)
 router.include_router(routing.router)
 router.include_router(vessels.router)
 router.include_router(fleet.router)
+router.include_router(fleet_profiles.router)
 router.include_router(companies.router)
+router.include_router(billing_data.router)
 router.include_router(zones.router)
 router.include_router(ai_router.router)
 router.include_router(weather.router)
