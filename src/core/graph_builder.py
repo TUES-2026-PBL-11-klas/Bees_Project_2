@@ -86,6 +86,10 @@ _DIRECT_CORRIDORS: list[tuple[str, str]] = [
     ("SEVASTOPOL", "ODESSA"),
     ("CONSTANTA", "SEVASTOPOL"),
     ("VARNA", "SEVASTOPOL"),
+    # Direct deep-water hop so Burgas → Sevastopol doesn't have to detour
+    # through Varna (the old graph forced this and the Burgas→Varna leg
+    # clipped the Bulgarian coast).
+    ("BURGAS", "SEVASTOPOL"),
 
     # Aegean
     ("CANAKKALE", "THESSALONIKI"),
@@ -214,6 +218,13 @@ _LEGACY_WAYPOINTS: list[dict] = [
     dict(port_id="WP_NORTH_AEGEAN", lat=39.50, lon=24.50, name="North Aegean (open sea)"),
     dict(port_id="WP_CENTRAL_AEGEAN", lat=37.50, lon=25.00, name="Central Aegean (open sea)"),
     dict(port_id="WP_CAPE_MALEAS", lat=36.20, lon=23.40, name="Cape Maleas (open sea)"),
+    # ── Black Sea open-water waypoints ────────────────────────────────
+    # All deep-water, well clear of any coastline so port-to-port edges
+    # routed via them never clip land.
+    dict(port_id="WP_BLACK_SEA_WEST", lat=43.50, lon=30.50, name="Western Black Sea (open sea)"),
+    dict(port_id="WP_BLACK_SEA_NW",   lat=44.60, lon=31.20, name="NW Black Sea (open sea)"),
+    dict(port_id="WP_BLACK_SEA_CENTRAL", lat=43.00, lon=34.00, name="Central Black Sea (open sea)"),
+    dict(port_id="WP_BLACK_SEA_EAST", lat=43.20, lon=38.50, name="Eastern Black Sea (open sea)"),
 ]
 
 # Legacy corridor edges between legacy WP_ nodes and nearby ports.
@@ -335,6 +346,23 @@ _LEGACY_WP_CORRIDORS: list[tuple[str, str]] = [
     ("WP_NORTH_SEA", "ROTTERDAM"),
     ("WP_NORTH_SEA", "ANTWERP"),
     ("WP_NORTH_SEA", "FELIXSTOWE"),
+    # ── Black Sea open-water corridors ────────────────────────────────
+    # Connect Black Sea ports to deep-water waypoints so cross-sea routes
+    # take an offshore great-circle instead of coast-clipping straight
+    # lines (e.g. Burgas → Sevastopol used to detour via Varna).
+    ("BURGAS", "WP_BLACK_SEA_WEST"),
+    ("VARNA",  "WP_BLACK_SEA_WEST"),
+    ("CONSTANTA", "WP_BLACK_SEA_WEST"),
+    ("CONSTANTA", "WP_BLACK_SEA_NW"),
+    ("ODESSA",    "WP_BLACK_SEA_NW"),
+    ("SEVASTOPOL","WP_BLACK_SEA_NW"),
+    ("SEVASTOPOL","WP_BLACK_SEA_CENTRAL"),
+    ("WP_BLACK_SEA_WEST",    "WP_BLACK_SEA_NW"),
+    ("WP_BLACK_SEA_WEST",    "WP_BLACK_SEA_CENTRAL"),
+    ("WP_BLACK_SEA_NW",      "WP_BLACK_SEA_CENTRAL"),
+    ("WP_BLACK_SEA_CENTRAL", "WP_BLACK_SEA_EAST"),
+    ("WP_BLACK_SEA_EAST",    "NOVOROSSIYSK"),
+    ("WP_BLACK_SEA_EAST",    "BATUMI"),
 ]
 
 

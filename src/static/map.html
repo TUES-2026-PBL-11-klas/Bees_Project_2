@@ -1158,6 +1158,13 @@ async function loadRainViewerRadar() {
     radarLayer = L.tileLayer(tileUrl, {
       opacity: 0.65,
       zIndex: 500,
+      // RainViewer tiles only exist up to z10. Tell Leaflet to upscale the
+      // z10 tiles instead of requesting non-existent tiles (which come back
+      // as the grey "Zoom Level Not Supported" placeholder PNG).
+      maxNativeZoom: 10,
+      maxZoom: 18,
+      noWrap: true,
+      bounds: [[-85, -180], [85, 180]],
       attribution: '<a href="https://www.rainviewer.com/" target="_blank">RainViewer</a>',
     });
 
@@ -1306,7 +1313,12 @@ async function fetchRouteWeather(waypoints) {
 async function initMap() {
   map = L.map('map', {
     center: [20, 30], zoom: 3, minZoom: 2, maxZoom: 18,
-    worldCopyJump: true,
+    // worldCopyJump + wrapped tile layers were causing duplicate-tile
+    // artifacts (the "parallel lines" the user saw) at certain zooms.
+    // Lock to a single world copy.
+    worldCopyJump: false,
+    maxBounds: [[-85, -180], [85, 180]],
+    maxBoundsViscosity: 1.0,
     zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 120,
     preferCanvas: true,
   });
@@ -1323,8 +1335,8 @@ async function initMap() {
 
   // Two basemaps: one dark, one light. Both have CARTO label overlays
   // that match their style, so POI/country names stay legible.
-  const darkOcean = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, attribution:'&copy; OpenStreetMap &copy; CARTO' });
-  const voyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, attribution:'&copy; OpenStreetMap &copy; CARTO' });
+  const darkOcean = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, noWrap:true, bounds:[[-85,-180],[85,180]], attribution:'&copy; OpenStreetMap &copy; CARTO' });
+  const voyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, noWrap:true, bounds:[[-85,-180],[85,180]], attribution:'&copy; OpenStreetMap &copy; CARTO' });
 
   const baseLayers = {
     'Dark Ocean': darkOcean,
