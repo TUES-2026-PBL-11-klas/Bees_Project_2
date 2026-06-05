@@ -1,14 +1,20 @@
 import json
 import logging
+from datetime import datetime
 from typing import Optional
 from pathlib import Path
 
 from bson import ObjectId
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from concurrent.futures import ThreadPoolExecutor
 from fastapi.responses import FileResponse
 
-from src.schemas.route import RouteCalculationSchema
+from src.schemas.route import (
+    RouteAnalyticsResponse,
+    RouteCalculationSchema,
+    RouteHistoryResponse,
+)
+from src.core.services.route_history_service import RouteHistoryService
 from src.core.routing.strategy import (
     FastestStrategy,
     EcoStrategy,
@@ -25,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/routes", tags=["routes"])
 repo = RouteRepository()
+history_service = RouteHistoryService(repo)
 
 
 
@@ -176,6 +183,64 @@ def get_landmask_geojson():
         media_type="application/geo+json",
         filename="ne_50m_land.geojson",
     )
+
+
+@router.get("/history", response_model=RouteHistoryResponse)
+def get_route_history(
+    company_id: Optional[str] = Query(default=None),
+    vessel_id: Optional[str] = Query(default=None),
+    optimization_mode: Optional[str] = Query(default=None, pattern="^(fastest|eco)$"),
+    from_date: Optional[datetime] = Query(default=None),
+    to_date: Optional[datetime] = Query(default=None),
+    is_valid: Optional[bool] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    """
+    Paginated route calculation history.
+
+    Filter by company, vessel, optimization mode, date range, and validity.
+    """
+    try:
+        return history_service.get_history(
+            company_id=company_id,
+            vessel_id=vessel_id,
+            optimization_mode=optimization_mode,
+            from_date=from_date,
+            to_date=to_date,
+            is_valid=is_valid,
+            limit=limit,
+            offset=offset,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/analytics", response_model=RouteAnalyticsResponse)
+def get_route_analytics(
+    company_id: Optional[str] = Query(default=None),
+    vessel_id: Optional[str] = Query(default=None),
+    optimization_mode: Optional[str] = Query(default=None, pattern="^(fastest|eco)$"),
+    from_date: Optional[datetime] = Query(default=None),
+    to_date: Optional[datetime] = Query(default=None),
+    is_valid: Optional[bool] = Query(default=None),
+):
+    """
+    Aggregated metrics over stored routes (totals, averages, breakdown by mode).
+
+    Supports the same filters as /history.
+    """
+    try:
+        return history_service.get_analytics(
+            company_id=company_id,
+            vessel_id=vessel_id,
+            optimization_mode=optimization_mode,
+            from_date=from_date,
+            to_date=to_date,
+            is_valid=is_valid,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/calculate")

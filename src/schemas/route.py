@@ -1,5 +1,7 @@
-from pydantic import BaseModel
+from datetime import datetime
 from typing import Optional, List
+
+from pydantic import BaseModel, Field
 
 
 class RouteCalculationSchema(BaseModel):
@@ -44,3 +46,66 @@ class RouteResultSchema(BaseModel):
     vessel_type_used: Optional[str] = None
     start_port: Optional[str] = None
     end_port: Optional[str] = None
+
+
+class RouteHistoryFilters(BaseModel):
+    company_id: Optional[str] = None
+    vessel_id: Optional[str] = None
+    optimization_mode: Optional[str] = None
+    from_date: Optional[datetime] = None
+    to_date: Optional[datetime] = None
+    is_valid: Optional[bool] = None
+
+
+class RouteHistoryItem(BaseModel):
+    id: str
+    request_id: str
+    company_id: str
+    vessel_id: str
+    optimization_mode: str
+    total_distance_nm: Optional[float] = None
+    estimated_duration_h: Optional[float] = None
+    estimated_fuel_tons: Optional[float] = None
+    waypoint_count: int = 0
+    is_valid: bool = True
+    calculated_at: Optional[datetime] = None
+
+
+class RouteHistoryResponse(BaseModel):
+    filters: RouteHistoryFilters
+    total: int
+    limit: int
+    offset: int
+    items: List[RouteHistoryItem]
+
+
+class ModeAnalytics(BaseModel):
+    count: int
+    total_distance_nm: float = 0.0
+    total_duration_h: float = 0.0
+    total_fuel_tons: float = 0.0
+    avg_distance_nm: float = 0.0
+    avg_duration_h: float = 0.0
+    avg_fuel_tons: float = 0.0
+
+
+class RouteAnalyticsTotals(BaseModel):
+    distance_nm: float = 0.0
+    duration_h: float = 0.0
+    fuel_tons: float = 0.0
+
+
+class RouteAnalyticsAverages(BaseModel):
+    distance_nm: float = 0.0
+    duration_h: float = 0.0
+    fuel_tons: float = 0.0
+
+
+class RouteAnalyticsResponse(BaseModel):
+    filters: RouteHistoryFilters
+    total_routes: int
+    valid_routes: int
+    invalid_routes: int
+    totals: RouteAnalyticsTotals
+    averages: RouteAnalyticsAverages
+    by_optimization_mode: dict[str, ModeAnalytics] = Field(default_factory=dict)
