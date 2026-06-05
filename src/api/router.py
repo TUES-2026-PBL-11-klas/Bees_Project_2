@@ -6,6 +6,7 @@ from src.api.v1.routers import (
     companies,
     fleet,
     fleet_profiles,
+    jobs,
     optimization,
     port_scheduling,
     routes,
@@ -31,3 +32,4 @@ router.include_router(weather.router)
 router.include_router(analytics.router)
 router.include_router(port_scheduling.router)
 router.include_router(optimization.router)
+router.include_router(jobs.router)
