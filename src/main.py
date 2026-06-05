@@ -17,8 +17,24 @@ from prometheus_fastapi_instrumentator import Instrumentator
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=settings.LOG_LEVEL.upper())
 
+_DEV_JWT_SECRET_PREFIX = "dev-only-jwt-secret"
+
+
+def _check_jwt_secret() -> None:
+    """Refuse to start in non-dev envs if JWT_SECRET is still the placeholder."""
+    if settings.APP_ENV.lower() != "development" and settings.JWT_SECRET.startswith(
+        _DEV_JWT_SECRET_PREFIX
+    ):
+        raise RuntimeError(
+            "JWT_SECRET is still the development placeholder. "
+            "Set JWT_SECRET in the environment to a strong random value "
+            "(at least 32 bytes) before running outside development."
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _check_jwt_secret()
     init_db()
     register_ai_observer()
     dispatcher.set_ws_manager(ws_manager)

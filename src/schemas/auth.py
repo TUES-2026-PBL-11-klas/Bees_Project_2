@@ -8,7 +8,7 @@ from src.models.user import ROLES
 class RegisterUserSchema(BaseModel):
     company_id: str
     email: str
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=12)
     full_name: Optional[str] = None
     role: str = "viewer"
 

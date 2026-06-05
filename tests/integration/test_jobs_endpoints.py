@@ -54,11 +54,11 @@ def admin_token(client) -> str:
     client.post("/api/v1/auth/bootstrap-admin", json={
         "company_id": company_id,
         "email": "admin@x.com",
-        "password": "supersecret",
+        "password": "supersecret123",
         "role": "admin",
     })
     login = client.post("/api/v1/auth/login", json={
-        "email": "admin@x.com", "password": "supersecret",
+        "email": "admin@x.com", "password": "supersecret123",
     })
     return login.json()["access_token"]
 
@@ -69,21 +69,21 @@ def viewer_token(client) -> str:
     # Bootstrap an admin first so we can have the admin create a viewer.
     client.post("/api/v1/auth/bootstrap-admin", json={
         "company_id": company_id, "email": "a@x.com",
-        "password": "supersecret", "role": "admin",
+        "password": "supersecret123", "role": "admin",
     })
     admin = client.post("/api/v1/auth/login", json={
-        "email": "a@x.com", "password": "supersecret",
+        "email": "a@x.com", "password": "supersecret123",
     }).json()["access_token"]
     client.post(
         "/api/v1/auth/register",
         headers={"Authorization": f"Bearer {admin}"},
         json={
             "company_id": company_id, "email": "v@x.com",
-            "password": "supersecret", "role": "viewer",
+            "password": "supersecret123", "role": "viewer",
         },
     )
     viewer = client.post("/api/v1/auth/login", json={
-        "email": "v@x.com", "password": "supersecret",
+        "email": "v@x.com", "password": "supersecret123",
     }).json()["access_token"]
     return viewer
 

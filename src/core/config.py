@@ -22,7 +22,10 @@ class Settings(BaseSettings):
     AI_WEATHER_FACTOR_WINTER: float = 1.15
 
     # JWT auth — change JWT_SECRET in production.
-    JWT_SECRET: str = "dev-only-secret-change-me"
+    # Default is 48 bytes so PyJWT does not warn about HMAC-SHA256
+    # key length in dev; the value is still a clearly-fake placeholder
+    # that the lifespan check refuses to let through in non-dev envs.
+    JWT_SECRET: str = "dev-only-jwt-secret-please-replace-in-production"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRES_MINUTES: int = 60
 
