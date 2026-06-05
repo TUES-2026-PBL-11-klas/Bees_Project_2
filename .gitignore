@@ -139,3 +139,4 @@ logs/
 alembic/versions/*.pyc
 
 node_modules/
+deploy/prometheus/alertmanager.yml
