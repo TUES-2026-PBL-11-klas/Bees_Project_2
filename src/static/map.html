@@ -1158,10 +1158,12 @@ async function loadRainViewerRadar() {
     radarLayer = L.tileLayer(tileUrl, {
       opacity: 0.65,
       zIndex: 500,
-      // RainViewer tiles only exist up to z10. Tell Leaflet to upscale the
-      // z10 tiles instead of requesting non-existent tiles (which come back
-      // as the grey "Zoom Level Not Supported" placeholder PNG).
-      maxNativeZoom: 10,
+      // RainViewer only serves real radar data up to z=7; at z≥8 it
+      // returns a 1370-byte "Zoom Level Not Supported" placeholder PNG
+      // for every empty region — that's what filled the map with grey
+      // boxes. Cap at 7 and let Leaflet upscale.
+      maxNativeZoom: 7,
+      minNativeZoom: 0,
       maxZoom: 18,
       noWrap: true,
       bounds: [[-85, -180], [85, 180]],
@@ -1190,16 +1192,16 @@ function toggleRadarLayer(enabled) {
   document.getElementById('radarLegend').classList.toggle('show', enabled);
 
   if (enabled) {
-    if (radarLayer) {
-      radarLayer.addTo(map);
-    } else {
-      loadRainViewerRadar();
-    }
-    // Auto-refresh radar every 5 minutes
+    // Always re-fetch on toggle-on — reusing a layer whose RainViewer
+    // frame timestamp expired upstream is what produced the persistent
+    // "Zoom Level Not Supported" grey tiles on the screenshots.
+    loadRainViewerRadar();
     if (!radarRefreshTimer) {
+      // RainViewer rolls frames every ~10 min and retires URLs after
+      // ~2 h. Refresh every 4 min so we never display a stale URL.
       radarRefreshTimer = setInterval(() => {
         if (radarVisible) loadRainViewerRadar();
-      }, 5 * 60 * 1000);
+      }, 4 * 60 * 1000);
     }
   } else {
     if (radarLayer && map.hasLayer(radarLayer)) {
@@ -3324,13 +3326,6 @@ async function requestAiReroute() {
     notify('Calculate a route first.', 'err');
     return;
   }
-  const vesselId = selectedRouteVesselId
-    || document.getElementById('vesselSelect').value
-    || _extractRouteVesselId();
-  if (!vesselId || vesselId.length < 12) {
-    notify('Select a real vessel in the Route panel before requesting AI rerouting.', 'err');
-    return;
-  }
 
   const btn = document.getElementById('aiRerouteBtn');
   btn.disabled = true;
@@ -3343,15 +3338,36 @@ async function requestAiReroute() {
     currentPosition = [navigationState.lastFix.lon, navigationState.lastFix.lat];
   }
 
+  const startNode = (currentRouteData.start_port
+    || currentRouteRequest?.start
+    || document.getElementById('startNode').value || '').trim();
+  const endNode = (currentRouteData.end_port
+    || currentRouteRequest?.end
+    || document.getElementById('endNode').value || '').trim();
+
+  const vesselId = selectedRouteVesselId
+    || document.getElementById('vesselSelect').value
+    || '';
+
   try {
-    const resp = await fetch('/api/v1/ai/reroute', {
+    // Stateless preview — no DB-backed vessel needed. The server recomputes
+    // the route with current + weather penalties applied and compares to
+    // the stats of the route currently on the map.
+    const resp = await fetch('/api/v1/ai/reroute/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        vessel_id: vesselId,
-        reason: 'manual_evaluation',
+        start_node_id: startNode,
+        end_node_id: endNode,
+        optimization_mode: currentStrategy,
+        vessel_id: vesselId && vesselId.length >= 12 ? vesselId : null,
         current_position: currentPosition,
-        force: false,
+        current_stats: {
+          total_distance_nm: currentRouteData.total_distance_nm || 0,
+          estimated_duration_h: currentRouteData.estimated_duration_h || 0,
+          estimated_fuel_tons: currentRouteData.estimated_fuel_tons || 0,
+        },
+        reason: 'manual_evaluation',
       }),
     });
 

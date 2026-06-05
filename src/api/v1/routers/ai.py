@@ -9,6 +9,7 @@ from src.core.services.ai.ws_manager import WebSocketManager
 from src.schemas.ai import (
     RerouteRequest,
     RerouteResponse,
+    ReroutePreviewRequest,
     RecommendationOut,
     RecommendationUpdate,
     AnomalyOut,
@@ -59,6 +60,183 @@ def request_reroute(request: RerouteRequest):
         raise HTTPException(status_code=500, detail=f"Reroute evaluation failed: {str(exc)}")
 
     return result
+
+
+# ── POST /api/v1/ai/reroute/preview ──────────────────────────────────
+
+
+@router.post("/reroute/preview")
+async def preview_reroute(request: ReroutePreviewRequest):
+    """
+    Stateless reroute preview.
+
+    Re-runs the routing strategy against the supplied origin/destination
+    with ocean-current and weather penalties layered on top, then returns
+    the alternative route + deltas vs the user-supplied current stats.
+    Works for the on-screen map route — no DB-backed vessel or persisted
+    route required.
+    """
+    # Local imports avoid hard-loading the graph at module import time.
+    from src.api.v1.routers.routes import (
+        _resolve_node_id,
+        _build_vessel_constraints,
+        _compute_route_stats,
+        _GRAPH,
+    )
+    from src.core.routing.strategy import (
+        EcoStrategy,
+        FastestStrategy,
+        CurrentAwareStrategy,
+    )
+
+    try:
+        start_id = _resolve_node_id(request.start_node_id)
+        end_id = _resolve_node_id(request.end_node_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not resolve ports: {exc}")
+
+    vessel = _build_vessel_constraints(
+        request.vessel_id or "",
+        request.vessel_type,
+    )
+
+    mode = (request.optimization_mode or "fastest").lower()
+    if mode == "eco":
+        base = EcoStrategy()
+    elif mode == "fastest":
+        base = FastestStrategy()
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid optimization_mode. Use 'fastest' or 'eco'.",
+        )
+
+    # ── Sample weather + currents along the great-circle midpoint band ──
+    # We sample a tiny grid (~10 points) so the call stays fast. The
+    # samples drive WeatherPenalty + CurrentBoost on the matching edges.
+    weather_data: dict[tuple[float, float], float] = {}
+    current_data: dict[tuple[float, float], tuple[float, float]] = {}
+
+    try:
+        start_wp = _GRAPH.get_waypoint(start_id)
+        end_wp = _GRAPH.get_waypoint(end_id)
+
+        sample_pts: list[tuple[float, float]] = []
+        for i in range(1, 11):
+            t = i / 11.0
+            lat = start_wp.latitude + t * (end_wp.latitude - start_wp.latitude)
+            lon = start_wp.longitude + t * (end_wp.longitude - start_wp.longitude)
+            sample_pts.append((round(lat * 2) / 2, round(lon * 2) / 2))
+
+        from src.core.grib_parser import fetch_currents_batch
+        currents = await fetch_currents_batch(sample_pts)
+        for (lat, lon), vec in zip(sample_pts, currents):
+            current_data[(lat, lon)] = (vec.u_ms, vec.v_ms)
+
+        # Weather penalty from wave height (cheap: reuse the current cache).
+        # We don't gate the reroute on it being present — zero penalty is fine.
+        from src.api.v1.routers.weather import _fetch_point_weather
+        import asyncio as _asyncio
+        weather_pts = await _asyncio.gather(
+            *[_fetch_point_weather(lat, lon) for lat, lon in sample_pts],
+            return_exceptions=True,
+        )
+        for (lat, lon), w in zip(sample_pts, weather_pts):
+            if isinstance(w, Exception):
+                continue
+            wave_h = w.get("wave_height")
+            wind_s = w.get("wind_speed_10m")
+            penalty = 0.0
+            if wave_h is not None:
+                penalty += max(0.0, (float(wave_h) - 1.0) / 4.0)   # 1m=0, 5m=1.0
+            if wind_s is not None:
+                penalty += max(0.0, (float(wind_s) - 30.0) / 50.0)  # 30km/h=0, 80=1.0
+            weather_data[(lat, lon)] = min(1.5, penalty)
+    except Exception as exc:
+        logger.info("Skipping environmental sampling for reroute: %s", exc)
+
+    strategy = CurrentAwareStrategy(base, current_data, weather_data)
+
+    try:
+        path = strategy.calculate_route(_GRAPH, start_id, end_id, vessel=vessel)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    if not path:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No alternative route found from {start_id} to {end_id}.",
+        )
+
+    new_stats = _compute_route_stats(path, vessel)
+    new_waypoints = [
+        {
+            "sequence": idx,
+            "coordinates": [wp.longitude, wp.latitude],
+            "point_type": "port" if idx in (0, len(path) - 1) else "waypoint",
+            "name": wp.name or None,
+        }
+        for idx, wp in enumerate(path)
+    ]
+
+    original = request.current_stats or {}
+    orig_dist = float(original.get("total_distance_nm") or 0.0)
+    orig_dur  = float(original.get("estimated_duration_h") or 0.0)
+    orig_fuel = float(original.get("estimated_fuel_tons") or 0.0)
+
+    deltas = {
+        "distance_nm": round(new_stats["total_distance_nm"] - orig_dist, 2),
+        "duration_h":  round(new_stats["estimated_duration_h"] - orig_dur, 2),
+        "fuel_tons":   round(new_stats["estimated_fuel_tons"] - orig_fuel, 2),
+    }
+
+    fuel_pct = (deltas["fuel_tons"] / orig_fuel) if orig_fuel > 0 else 0.0
+    time_pct = (deltas["duration_h"] / orig_dur) if orig_dur > 0 else 0.0
+
+    # Suggest the reroute if either fuel or time improves > 1%, or if the
+    # waypoint sequence differs and there's any net improvement.
+    improved = (fuel_pct < -0.01) or (time_pct < -0.01)
+    status = "suggested" if improved else "evaluated"
+
+    if status == "suggested":
+        bits = ["Reroute recommended"]
+        if request.reason:
+            bits.append(f" due to {request.reason.replace('_', ' ')}")
+        bits.append(". ")
+        if deltas["fuel_tons"] < 0:
+            bits.append(f"Saves ~{abs(deltas['fuel_tons']):.2f} t fuel ({abs(fuel_pct*100):.1f}%). ")
+        if deltas["duration_h"] < 0:
+            bits.append(f"Saves ~{abs(deltas['duration_h']):.2f} h ({abs(time_pct*100):.1f}%). ")
+        if deltas["distance_nm"] < 0:
+            bits.append(f"Shorter by {abs(deltas['distance_nm']):.1f} NM. ")
+        recommendation = "".join(bits).strip()
+    else:
+        recommendation = (
+            "Current route remains optimal. Alternative differs by "
+            f"{abs(fuel_pct*100):.1f}% fuel and {abs(time_pct*100):.1f}% time — "
+            "below reroute thresholds."
+        )
+
+    return {
+        "reroute_id": None,
+        "status": status,
+        "reason": request.reason or "manual_evaluation",
+        "original_route": {
+            "total_distance_nm": orig_dist,
+            "estimated_duration_h": orig_dur,
+            "estimated_fuel_tons": orig_fuel,
+        },
+        "new_route": new_stats,
+        "new_waypoints": new_waypoints,
+        "deltas": deltas,
+        "recommendation": recommendation,
+        "samples": {
+            "current_points": len(current_data),
+            "weather_points": len(weather_data),
+        },
+    }
 
 
 # ── GET /api/v1/ai/recommendations ───────────────────────────────────

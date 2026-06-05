@@ -27,4 +27,8 @@ class RouteHistory(me.Document):
         "collection": "route_history",
         "indexes": ["vessel_id", "company_id", "-calculated_at"],
         "ordering": ["-calculated_at"],
+        # Older bootstrap seeds wrote additional fields (strategy,
+        # actual_fuel_tons, calculated_time_h, origin, destination, …).
+        # strict=False so those legacy docs still load via mongoengine.
+        "strict": False,
     }
