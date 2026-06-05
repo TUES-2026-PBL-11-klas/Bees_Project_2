@@ -1,6 +1,5 @@
 import mongoengine as me
 from datetime import datetime
-from src.core.events.event import Event
 
 class Zone(me.Document):
     name = me.StringField(required=True)
@@ -20,19 +19,3 @@ class Zone(me.Document):
             {"fields": ["geometry"], "cls": False}
         ]
     }
-
-    def update_status(self, new_status: str):
-        old_status = self.status
-        self.status = new_status
-        self.save()
-
-        event = Event(
-            event_type="ZONE_STATUS_CHANGED",
-            data={
-                "zone_id": str(self.id),
-                "old_status": old_status,
-                "new_status": new_status
-            }
-        )
-
-        dispatcher.dispatch(event)
