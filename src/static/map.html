@@ -1463,13 +1463,15 @@ async function initMap() {
   });
 
   map.on('zoom', () => setStatus(`Zoom: ${map.getZoom().toFixed(1)}`));
-  // Debounce zone re-rendering to avoid lag during pan/zoom
+  // Debounce zone re-rendering to avoid lag during pan/zoom — 500 ms keeps
+  // weaker hardware from hitching as the antimeridian-aware re-render
+  // rebuilds every zone layer.
   let _moveEndTimer = null;
   map.on('moveend', () => {
     if (_moveEndTimer) clearTimeout(_moveEndTimer);
     _moveEndTimer = setTimeout(() => {
       if (zonesVisible) renderZonesOnMap();
-    }, 300);
+    }, 500);
   });
   setStatus('Ready');
   await loadVesselTypes();
@@ -3449,17 +3451,31 @@ function dismissAiReroute(silent = false) {
 }
 
 initMap();
-// Poll zones every 30s, but only when the tab is visible — otherwise
-// background tabs burn through API calls and CPU for nothing the user
-// can see.
-routeRefreshTimer = setInterval(() => {
-  if (document.visibilityState === 'visible') {
-    loadZones();
+
+// Background poll: zones every 30s. The visibilitychange handler clears
+// all three timers when the tab is hidden so background tabs cost nothing.
+routeRefreshTimer = setInterval(loadZones, 30000);
+
+function pauseBackgroundTimers() {
+  if (routeRefreshTimer)  { clearInterval(routeRefreshTimer);  routeRefreshTimer = null; }
+  if (regionWeatherTimer) { clearInterval(regionWeatherTimer); regionWeatherTimer = null; }
+  if (radarRefreshTimer)  { clearInterval(radarRefreshTimer);  radarRefreshTimer = null; }
+}
+
+function resumeBackgroundTimers() {
+  if (!routeRefreshTimer)  routeRefreshTimer  = setInterval(loadZones, 30000);
+  if (!regionWeatherTimer) regionWeatherTimer = setInterval(loadRegionalWeather, 10 * 60 * 1000);
+  if (!radarRefreshTimer && radarVisible) {
+    radarRefreshTimer = setInterval(() => { if (radarVisible) loadRainViewerRadar(); }, 4 * 60 * 1000);
   }
-}, 30000);
+}
+
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
+    resumeBackgroundTimers();
     loadZones();
+  } else {
+    pauseBackgroundTimers();
   }
 });
 </script>

@@ -9,9 +9,12 @@ from mongoengine.connection import get_connection
 
 from src.core.config import settings
 from src.models.audit_log import AuditLog
+from src.models.billing_data import BillingData
 from src.models.company import Company
 from src.models.event import Event
+from src.models.fleet_profile import FleetProfile
 from src.models.route import Route
+from src.models.user import User
 from src.models.vessel import Vessel, VesselSpecs
 from src.models.zone import Zone
 
@@ -75,7 +78,17 @@ def connect_db() -> str:
 
 
 def ensure_indexes() -> None:
-    for model in (Company, Vessel, Zone, Route, Event, AuditLog):
+    for model in (
+        Company,
+        Vessel,
+        Zone,
+        Route,
+        Event,
+        AuditLog,
+        FleetProfile,
+        BillingData,
+        User,
+    ):
         model.ensure_indexes()
 
 

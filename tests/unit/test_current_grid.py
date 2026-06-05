@@ -95,3 +95,61 @@ def test_load_json_roundtrip(tmp_path: Path):
 
 def test_load_auto_missing_file_returns_none(tmp_path: Path):
     assert load_auto(tmp_path / "nope.json") is None
+
+
+def test_load_auto_dispatches_grib_extension(tmp_path: Path, monkeypatch):
+    """A .grib2 path goes through load_grib2, not load_json."""
+    from src.core.services import current_grid as cg
+
+    grib_path = tmp_path / "currents.grib2"
+    grib_path.write_bytes(b"fake-grib-bytes")
+
+    sentinel = _simple_grid()
+
+    def _fake_loader(path):
+        assert Path(path) == grib_path
+        return sentinel
+
+    monkeypatch.setattr(cg, "load_grib2", _fake_loader)
+    assert load_auto(grib_path) is sentinel
+
+
+def test_load_auto_returns_none_when_grib_unavailable(tmp_path: Path, monkeypatch):
+    """When pygrib isn't installed, .grib paths log + return None instead of crashing."""
+    from src.core.services import current_grid as cg
+
+    grib_path = tmp_path / "currents.grib"
+    grib_path.write_bytes(b"fake")
+
+    def _fail(path):
+        raise RuntimeError("pygrib not installed")
+
+    monkeypatch.setattr(cg, "load_grib2", _fail)
+    assert load_auto(grib_path) is None
+
+
+def test_load_grib2_raises_without_pygrib(tmp_path: Path, monkeypatch):
+    """The loader gives a clear RuntimeError when pygrib import fails."""
+    import builtins
+
+    from src.core.services import current_grid as cg
+
+    real_import = builtins.__import__
+
+    def _no_pygrib(name, *args, **kwargs):
+        if name == "pygrib":
+            raise ImportError("not installed")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _no_pygrib)
+    with pytest.raises(RuntimeError, match="pygrib is not installed"):
+        cg.load_grib2(tmp_path / "anything.grib2")
+
+
+def test_sample_zero_step_grid_returns_zero():
+    """A degenerate grid (dlat or dlon == 0) must not divide by zero."""
+    g = CurrentGrid(
+        lat0=0.0, lon0=0.0, dlat=0.0, dlon=1.0,
+        nrows=1, ncols=2, u=[[1.0, 1.0]], v=[[0.0, 0.0]],
+    )
+    assert g.sample(0.0, 0.5) == (0.0, 0.0)

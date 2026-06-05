@@ -91,7 +91,46 @@ Notes:
 - `carto-positron` is a lighter alternative if you want a cleaner look.
 - The route and zone overlays still come from the app itself.
 
-### Strategy Tests
+### Authentication
+
+The API ships with JWT-based auth and role-based access control (admin / operator / viewer).
+
+1. Bootstrap the first admin for a company:
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/bootstrap-admin \
+  -H "Content-Type: application/json" \
+  -d '{"company_id": "<oid>", "email": "you@example.com", "password": "supersecret", "role": "admin"}'
+```
+
+2. Log in to get a bearer token:
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@example.com", "password": "supersecret"}'
+```
+
+3. Call protected endpoints with `Authorization: Bearer <token>`. Use `/api/v1/auth/me` to verify.
+
+Set `JWT_SECRET` in `.env` to a long random value in any non-dev environment.
+
+### Background jobs
+
+The platform has an in-process task queue for GRIB ingest, analytics rollups, AI reroutes, and weather refresh. Admins can enqueue jobs by name and inspect their state:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/jobs/grib_ingest \
+  -H "Authorization: Bearer <admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"path": "/data/currents.grib2"}'
+```
+
+Production deployments can swap the in-process implementation for an RQ + Redis backend; the `TaskQueue` interface (`src/infrastructure/queue/task_queue.py`) is the only thing that needs to change.
+
+### Architecture diagrams
+
+See [docs/architecture.md](docs/architecture.md) for the module map, class diagrams (routing, AI, auth/tenancy), sequence diagrams (route calculation, JWT login, background jobs), and deployment topology.
+
+### Tests
 Run strategy-only tests:
 
 ```bash
@@ -102,6 +141,12 @@ Run all unit tests:
 
 ```bash
 pytest -q tests/unit
+```
+
+Run the full suite with coverage:
+
+```bash
+pytest --cov=src --cov-report=term tests/
 ```
 
 ### Run hooks manually

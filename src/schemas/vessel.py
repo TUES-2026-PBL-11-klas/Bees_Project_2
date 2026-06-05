@@ -22,6 +22,10 @@ class VesselSpecsSchema(BaseModel):
     max_speed_knots: Optional[float] = None
     length_m: Optional[float] = None
     beam_m: Optional[float] = None
+    max_cargo_t: Optional[float] = None
+    cargo_weight_t: Optional[float] = None
+    trim_m: Optional[float] = None
+    hydro_resistance_coef: Optional[float] = None
 
 
 class VesselCreateSchema(VesselTypeValidationMixin):
