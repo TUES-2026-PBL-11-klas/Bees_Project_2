@@ -304,3 +304,51 @@ class TestCalculateBatchRoutes:
         results = response.json()
         assert "waypoints" in results[0]
         assert "error" in results[1]
+
+
+class TestRouteCache:
+    def test_repeat_request_is_cache_hit(self, client):
+        from src.api.v1.routers.routes import _ROUTE_CACHE
+        _ROUTE_CACHE.clear()
+
+        first = client.post("/api/v1/routes/calculate", json=VALID_ROUTE_PAYLOAD)
+        assert first.status_code == 200
+        assert first.json()["cache_hit"] is False
+
+        second = client.post("/api/v1/routes/calculate", json=VALID_ROUTE_PAYLOAD)
+        assert second.status_code == 200
+        assert second.json()["cache_hit"] is True
+
+        assert first.json()["waypoints"] == second.json()["waypoints"]
+        assert first.json()["total_distance_nm"] == second.json()["total_distance_nm"]
+
+    def test_different_mode_is_not_cache_hit(self, client):
+        from src.api.v1.routers.routes import _ROUTE_CACHE
+        _ROUTE_CACHE.clear()
+
+        client.post("/api/v1/routes/calculate", json=VALID_ROUTE_PAYLOAD)
+        with patch("src.core.spatial.zone_spatial_service.ZoneSpatialService.is_route_blocked", return_value=False):
+            other = client.post(
+                "/api/v1/routes/calculate",
+                json={**VALID_ROUTE_PAYLOAD, "optimization_mode": "eco"},
+            )
+        assert other.status_code == 200
+        assert other.json()["cache_hit"] is False
+
+    def test_cache_evicts_oldest_when_full(self, client):
+        from src.api.v1.routers.routes import (
+            _ROUTE_CACHE,
+            _ROUTE_CACHE_MAX,
+            _route_cache_set,
+        )
+        _ROUTE_CACHE.clear()
+        for i in range(_ROUTE_CACHE_MAX + 5):
+            _route_cache_set(
+                (f"START_{i}", "END", "", "", "fastest"),
+                {"waypoints": [], "stats": {}},
+            )
+        assert len(_ROUTE_CACHE) == _ROUTE_CACHE_MAX
+        # The first 5 keys should have been evicted.
+        assert ("START_0", "END", "", "", "fastest") not in _ROUTE_CACHE
+        assert ("START_4", "END", "", "", "fastest") not in _ROUTE_CACHE
+        assert ("START_5", "END", "", "", "fastest") in _ROUTE_CACHE

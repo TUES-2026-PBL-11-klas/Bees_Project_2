@@ -1,5 +1,7 @@
+import copy
 import json
 import logging
+from collections import OrderedDict
 from typing import Optional
 from pathlib import Path
 
@@ -57,6 +59,37 @@ _FUEL_MULTIPLIERS: dict[str, float] = {
 _GRAPH = build_navigation_graph()
 _LAND_MASK_PATH = Path(__file__).resolve().parents[4] / "ne_50m_land.geojson"
 _LAND_MASK_CACHE: Optional[bytes] = None
+
+# Bounded LRU cache for /calculate. Keyed on the inputs that actually
+# determine the computed path + stats; company_id is intentionally not
+# in the key so identical requests from different tenants reuse the
+# expensive graph traversal.
+_ROUTE_CACHE_MAX = 256
+_ROUTE_CACHE: "OrderedDict[tuple, dict]" = OrderedDict()
+
+
+def _route_cache_key(request: RouteCalculationSchema) -> tuple:
+    return (
+        request.start_node_id,
+        request.end_node_id,
+        request.vessel_id or "",
+        request.vessel_type or "",
+        request.optimization_mode,
+    )
+
+
+def _route_cache_get(key: tuple) -> Optional[dict]:
+    if key not in _ROUTE_CACHE:
+        return None
+    _ROUTE_CACHE.move_to_end(key)
+    return _ROUTE_CACHE[key]
+
+
+def _route_cache_set(key: tuple, value: dict) -> None:
+    _ROUTE_CACHE[key] = value
+    _ROUTE_CACHE.move_to_end(key)
+    while len(_ROUTE_CACHE) > _ROUTE_CACHE_MAX:
+        _ROUTE_CACHE.popitem(last=False)
 
 
 
@@ -202,35 +235,43 @@ def calculate_route(request: RouteCalculationSchema):
     else:
         raise HTTPException(status_code=400, detail="Invalid optimization mode. Use 'fastest' or 'eco'.")
 
+    cache_key = _route_cache_key(request)
+    cached = _route_cache_get(cache_key)
+    cache_hit = cached is not None
 
-    try:
-        path = strategy.calculate_route(_GRAPH, start_id, end_id, vessel=vessel)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    if cache_hit:
+        waypoints = copy.deepcopy(cached["waypoints"])
+        stats = dict(cached["stats"])
+    else:
+        try:
+            path = strategy.calculate_route(_GRAPH, start_id, end_id, vessel=vessel)
+        except KeyError as e:
+            raise HTTPException(status_code=404, detail=str(e))
 
-    if not path:
-        raise HTTPException(status_code=404, detail=f"No route found from {start_id} to {end_id}.")
-
-
-    waypoints = []
-    for idx, wp in enumerate(path):
-        point_type = "waypoint"
-        if idx == 0:
-            point_type = "port"
-        elif idx == len(path) - 1:
-            point_type = "port"
-        elif not wp.node_id.startswith("WP_"):
-            point_type = "port"
-
-        waypoints.append({
-            "sequence": idx,
-            "coordinates": [wp.longitude, wp.latitude],
-            "point_type": point_type,
-            "name": wp.name if not wp.node_id.startswith("WP_") else None,
-        })
+        if not path:
+            raise HTTPException(status_code=404, detail=f"No route found from {start_id} to {end_id}.")
 
 
-    stats = _compute_route_stats(path, vessel)
+        waypoints = []
+        for idx, wp in enumerate(path):
+            point_type = "waypoint"
+            if idx == 0:
+                point_type = "port"
+            elif idx == len(path) - 1:
+                point_type = "port"
+            elif not wp.node_id.startswith("WP_"):
+                point_type = "port"
+
+            waypoints.append({
+                "sequence": idx,
+                "coordinates": [wp.longitude, wp.latitude],
+                "point_type": point_type,
+                "name": wp.name if not wp.node_id.startswith("WP_") else None,
+            })
+
+
+        stats = _compute_route_stats(path, vessel)
+        _route_cache_set(cache_key, {"waypoints": copy.deepcopy(waypoints), "stats": dict(stats)})
 
 
     route_data = {
@@ -277,6 +318,7 @@ def calculate_route(request: RouteCalculationSchema):
     result["vessel_type_used"] = vessel.vessel_type if vessel else None
     result["start_port"] = start_id
     result["end_port"] = end_id
+    result["cache_hit"] = cache_hit
 
     return result
 
