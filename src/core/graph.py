@@ -55,6 +55,8 @@ class Edge:
         is_blocked:   When ``True`` the edge is treated as impassable.
         max_draft_m:  Maximum vessel draft (in metres) allowed on this
                       passage.  ``None`` means no restriction.
+        current_u:    East-west ocean current component (m/s, positive = east).
+        current_v:    North-south ocean current component (m/s, positive = north).
     """
     source: Waypoint
     destination: Waypoint
@@ -63,6 +65,8 @@ class Edge:
     max_draft_m: Optional[float] = None
     max_length_m: Optional[float] = None
     max_beam_m: Optional[float] = None
+    current_u: float = 0.0
+    current_v: float = 0.0
 
     def __post_init__(self) -> None:
         self.weight = self.source.distance_to(self.destination)
@@ -74,6 +78,46 @@ class Edge:
     def unblock(self) -> None:
         """Remove the impassable flag."""
         self.is_blocked = False
+
+    def effective_weight(
+        self,
+        vessel_speed_knots: float = 14.0,
+    ) -> float:
+        """
+        Return the edge weight adjusted for ocean currents.
+
+        A current aligned with the vessel heading *reduces* the effective
+        distance (making the edge cheaper), while an opposing current
+        *increases* it.  With zero current the raw haversine weight is
+        returned unchanged.
+
+        The adjustment factor is clamped to [0.5, 2.0] to avoid extreme
+        values from very strong currents or very slow vessels.
+        """
+        if self.current_u == 0.0 and self.current_v == 0.0:
+            return self.weight
+
+        # Vessel heading in radians (north = 0, clockwise)
+        dlat = self.destination.latitude - self.source.latitude
+        dlon = self.destination.longitude - self.source.longitude
+        heading_rad = math.atan2(dlon, dlat)
+
+        # Component of current along vessel heading (m/s)
+        current_along = (
+            self.current_u * math.sin(heading_rad)
+            + self.current_v * math.cos(heading_rad)
+        )
+
+        # Convert vessel speed to m/s for comparison
+        vessel_speed_ms = vessel_speed_knots * 0.514444
+        if vessel_speed_ms <= 0:
+            return self.weight
+
+        # Adjustment: positive current_along = favourable
+        factor = 1.0 - (current_along / vessel_speed_ms)
+        factor = max(0.5, min(2.0, factor))
+
+        return self.weight * factor
 
 class NavigationGraph:
     """
@@ -165,6 +209,8 @@ class NavigationGraph:
         origin_id: str,
         destination_id: str,
         edge_filter=None,
+        use_current_weights: bool = False,
+        vessel_speed_knots: float = 14.0,
     ) -> Optional[list[Waypoint]]:
         """
         Find the shortest unblocked path between two waypoints using A*.
@@ -217,7 +263,12 @@ class NavigationGraph:
                 if neighbour_id in closed:
                     continue
 
-                tentative_g = g_score[current_id] + edge.weight
+                edge_cost = (
+                    edge.effective_weight(vessel_speed_knots)
+                    if use_current_weights
+                    else edge.weight
+                )
+                tentative_g = g_score[current_id] + edge_cost
 
                 if tentative_g < g_score.get(neighbour_id, math.inf):
                     g_score[neighbour_id] = tentative_g

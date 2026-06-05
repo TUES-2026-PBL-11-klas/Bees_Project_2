@@ -32,3 +32,4 @@ from src.models.ai_models import (
     AIRecommendation,
     ETAPrediction,
 )
+from src.models.route_history import RouteHistory

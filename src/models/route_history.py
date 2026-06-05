@@ -1,0 +1,30 @@
+import mongoengine as me
+from datetime import datetime
+
+
+class RouteHistory(me.Document):
+    """Stores a historical snapshot of every computed route for analytics and auditing."""
+
+    route_id = me.ObjectIdField()
+    vessel_id = me.ObjectIdField()
+    company_id = me.ObjectIdField()
+    origin_port = me.StringField()
+    destination_port = me.StringField()
+    optimization_mode = me.StringField(choices=["fastest", "eco"])
+    total_distance_nm = me.FloatField()
+    estimated_duration_h = me.FloatField()
+    estimated_fuel_tons = me.FloatField()
+    waypoint_count = me.IntField()
+    weather_conditions = me.DictField()
+    current_conditions = me.DictField()
+    calculated_at = me.DateTimeField(default=datetime.utcnow)
+    status = me.StringField(
+        choices=["completed", "cancelled", "in_progress"],
+        default="completed",
+    )
+
+    meta = {
+        "collection": "route_history",
+        "indexes": ["vessel_id", "company_id", "-calculated_at"],
+        "ordering": ["-calculated_at"],
+    }

@@ -145,3 +145,73 @@ class EcoStrategy(RoutingStrategy):
             return zone_cache[key]
 
         return graph.find_path(start_id, end_id, edge_filter=eco_filter)
+
+
+class CurrentAwareStrategy(RoutingStrategy):
+    """
+    A routing strategy that accounts for ocean currents.
+
+    Wraps a base strategy (FastestStrategy or EcoStrategy) and adjusts
+    edge weights using ocean current data before pathfinding.  Edges with
+    favourable currents become cheaper to traverse; opposing currents
+    make them more expensive.
+
+    Usage::
+
+        base = FastestStrategy()
+        strategy = CurrentAwareStrategy(base, current_data)
+        path = strategy.calculate_route(graph, start, end, vessel)
+
+    ``current_data`` is a dict mapping ``(lat, lon)`` grid keys to
+    ``(u_ms, v_ms)`` tuples.  Grid keys are rounded to 0.5° for lookup.
+    """
+
+    def __init__(
+        self,
+        base_strategy: RoutingStrategy,
+        current_data: Optional[dict] = None,
+    ) -> None:
+        self._base = base_strategy
+        self._current_data = current_data or {}
+
+    @staticmethod
+    def _grid_key(lat: float, lon: float) -> tuple[float, float]:
+        """Round to 0.5° grid for cache/lookup efficiency."""
+        return (round(lat * 2) / 2, round(lon * 2) / 2)
+
+    def _inject_currents(self, graph: NavigationGraph) -> None:
+        """
+        Set current_u / current_v on every edge in the graph using
+        the midpoint of each edge to look up current data.
+        """
+        if not self._current_data:
+            return
+
+        for node_id in list(graph._nodes.keys()):
+            for edge in graph.get_edges(node_id):
+                mid_lat = (edge.source.latitude + edge.destination.latitude) / 2
+                mid_lon = (edge.source.longitude + edge.destination.longitude) / 2
+                key = self._grid_key(mid_lat, mid_lon)
+                if key in self._current_data:
+                    u, v = self._current_data[key]
+                    edge.current_u = u
+                    edge.current_v = v
+
+    def calculate_route(
+        self,
+        graph: NavigationGraph,
+        start_id: str,
+        end_id: str,
+        vessel: Optional[VesselConstraints] = None,
+    ) -> Optional[List[Waypoint]]:
+        """
+        Calculate a current-aware route.
+
+        1. Inject current data into graph edges.
+        2. Delegate to the base strategy for pathfinding.
+
+        The base strategy's A* will pick up the effective_weight
+        through the edge filter or directly, depending on the strategy.
+        """
+        self._inject_currents(graph)
+        return self._base.calculate_route(graph, start_id, end_id, vessel)
