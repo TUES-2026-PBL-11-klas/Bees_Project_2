@@ -3,6 +3,7 @@ from src.api.v1.routers import (
     analytics,
     companies,
     fleet,
+    optimization,
     port_scheduling,
     routes,
     routing,
@@ -23,3 +24,4 @@ router.include_router(ai_router.router)
 router.include_router(weather.router)
 router.include_router(analytics.router)
 router.include_router(port_scheduling.router)
+router.include_router(optimization.router)

@@ -10,6 +10,19 @@ class RerouteRequest(BaseModel):
     current_position: Optional[List[float]] = None
 
 
+class GenerateRecommendationsRequest(BaseModel):
+    """POST /ai/recommendations/generate request body."""
+    vessel_id: Optional[str] = None
+    company_id: Optional[str] = None
+
+
+class ApplyRerouteRequest(BaseModel):
+    """POST /ai/reroute/apply request body."""
+    route_id: str
+    new_waypoints: List[Dict[str, Any]]
+    new_stats: Optional[Dict[str, Any]] = None
+
+
 class ReroutePreviewRequest(BaseModel):
     """
     POST /ai/reroute/preview request body.

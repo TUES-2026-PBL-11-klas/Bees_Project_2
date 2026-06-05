@@ -456,6 +456,85 @@ async def get_ocean_currents(
         raise HTTPException(status_code=502, detail=str(exc))
 
 
+@router.get("/currents/grid")
+async def get_currents_grid(
+    min_lat: float = Query(..., ge=-90, le=90),
+    min_lon: float = Query(..., ge=-180, le=180),
+    max_lat: float = Query(..., ge=-90, le=90),
+    max_lon: float = Query(..., ge=-180, le=180),
+    step_deg: float = Query(1.0, gt=0.1, le=5.0, description="Grid step in degrees"),
+):
+    """
+    Return an ocean-current U/V grid for the given bounding box.
+
+    If a GRIB2 (or JSON-backed) :class:`CurrentGrid` is configured via
+    ``settings.CURRENT_GRID_PATH``, the data is interpolated from it.
+    Otherwise the endpoint falls back to the existing Stokes-drift
+    estimate sampled at every grid point.
+    """
+    import os
+    from src.core.services.current_grid import load_auto
+    from src.core.grib_parser import fetch_currents_batch
+
+    if max_lat <= min_lat or max_lon <= min_lon:
+        raise HTTPException(status_code=400, detail="bbox max must exceed min")
+
+    lats: list[float] = []
+    lat = min_lat
+    while lat <= max_lat + 1e-9:
+        lats.append(round(lat, 4))
+        lat += step_deg
+    lons: list[float] = []
+    lon = min_lon
+    while lon <= max_lon + 1e-9:
+        lons.append(round(lon, 4))
+        lon += step_deg
+
+    if len(lats) * len(lons) > 1000:
+        raise HTTPException(
+            status_code=400,
+            detail="Requested grid too large (>1000 points). Increase step_deg.",
+        )
+
+    points = [(la, lo) for la in lats for lo in lons]
+
+    grid_path = os.environ.get("CURRENT_GRID_PATH")
+    grid = load_auto(grid_path) if grid_path else None
+
+    results: list[dict] = []
+    if grid is not None:
+        for la, lo in points:
+            u, v = grid.sample(la, lo)
+            speed_ms = (u * u + v * v) ** 0.5
+            results.append({
+                "lat": la,
+                "lon": lo,
+                "u_ms": round(u, 4),
+                "v_ms": round(v, 4),
+                "speed_knots": round(speed_ms * 1.94384, 3),
+            })
+        source = "grib"
+    else:
+        currents = await fetch_currents_batch(points)
+        for (la, lo), c in zip(points, currents):
+            results.append({
+                "lat": la,
+                "lon": lo,
+                "u_ms": round(c.u_ms, 4),
+                "v_ms": round(c.v_ms, 4),
+                "speed_knots": round(c.speed_knots, 3),
+            })
+        source = "stokes_drift"
+
+    return {
+        "source": source,
+        "bbox": {"min_lat": min_lat, "min_lon": min_lon, "max_lat": max_lat, "max_lon": max_lon},
+        "step_deg": step_deg,
+        "point_count": len(results),
+        "points": results,
+    }
+
+
 @router.get("/currents/route")
 async def get_route_currents(
     points: str = Query(

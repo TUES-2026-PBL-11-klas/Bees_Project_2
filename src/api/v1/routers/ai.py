@@ -10,6 +10,8 @@ from src.schemas.ai import (
     RerouteRequest,
     RerouteResponse,
     ReroutePreviewRequest,
+    ApplyRerouteRequest,
+    GenerateRecommendationsRequest,
     RecommendationOut,
     RecommendationUpdate,
     AnomalyOut,
@@ -237,6 +239,61 @@ async def preview_reroute(request: ReroutePreviewRequest):
             "weather_points": len(weather_data),
         },
     }
+
+
+# ── POST /api/v1/ai/reroute/apply ────────────────────────────────────
+
+
+@router.post("/reroute/apply")
+def apply_reroute(request: ApplyRerouteRequest):
+    """
+    Persist an accepted reroute alternative as the active Route.
+
+    Replaces the existing Route's waypoints + summary stats. Returns the
+    updated route document.
+    """
+    service = _get_ai_service()
+
+    try:
+        result = service.apply_reroute(
+            route_id=request.route_id,
+            new_waypoints=request.new_waypoints,
+            new_stats=request.new_stats,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Apply-reroute error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    if result is None:
+        raise HTTPException(status_code=404, detail="Route not found")
+    return result
+
+
+# ── POST /api/v1/ai/recommendations/generate ─────────────────────────
+
+
+@router.post("/recommendations/generate", response_model=List[RecommendationOut])
+def generate_recommendations(request: GenerateRecommendationsRequest):
+    """
+    Run all recommendation generators for *vessel_id* or *company_id*
+    and persist them. Returns the newly-created list.
+    """
+    service = _get_ai_service()
+
+    try:
+        results = service.generate_recommendations(
+            vessel_id=request.vessel_id,
+            company_id=request.company_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Generate-recommendations error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    return results
 
 
 # ── GET /api/v1/ai/recommendations ───────────────────────────────────
