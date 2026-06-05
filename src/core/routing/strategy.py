@@ -149,42 +149,39 @@ class EcoStrategy(RoutingStrategy):
 
 class CurrentAwareStrategy(RoutingStrategy):
     """
-    A routing strategy that accounts for ocean currents.
+    A routing strategy that accounts for ocean currents and (optionally)
+    weather along the route.
 
     Wraps a base strategy (FastestStrategy or EcoStrategy) and adjusts
-    edge weights using ocean current data before pathfinding.  Edges with
-    favourable currents become cheaper to traverse; opposing currents
-    make them more expensive.
+    edge weights using ocean current and weather data before pathfinding,
+    so edges are scored by::
 
-    Usage::
-
-        base = FastestStrategy()
-        strategy = CurrentAwareStrategy(base, current_data)
-        path = strategy.calculate_route(graph, start, end, vessel)
+        Cost = DistanceWeight + WeatherPenalty - CurrentBoost
 
     ``current_data`` is a dict mapping ``(lat, lon)`` grid keys to
-    ``(u_ms, v_ms)`` tuples.  Grid keys are rounded to 0.5° for lookup.
+    ``(u_ms, v_ms)`` tuples.  ``weather_data`` is a dict mapping the same
+    grid keys to a unit-less penalty in roughly ``[0, 1]`` (0 = calm,
+    1 = severe).  Grid keys are rounded to 0.5° for lookup.
     """
 
     def __init__(
         self,
         base_strategy: RoutingStrategy,
         current_data: Optional[dict] = None,
+        weather_data: Optional[dict] = None,
     ) -> None:
         self._base = base_strategy
         self._current_data = current_data or {}
+        self._weather_data = weather_data or {}
 
     @staticmethod
     def _grid_key(lat: float, lon: float) -> tuple[float, float]:
         """Round to 0.5° grid for cache/lookup efficiency."""
         return (round(lat * 2) / 2, round(lon * 2) / 2)
 
-    def _inject_currents(self, graph: NavigationGraph) -> None:
-        """
-        Set current_u / current_v on every edge in the graph using
-        the midpoint of each edge to look up current data.
-        """
-        if not self._current_data:
+    def _inject_environment(self, graph: NavigationGraph) -> None:
+        """Annotate every edge with current + weather data at its midpoint."""
+        if not self._current_data and not self._weather_data:
             return
 
         for node_id in list(graph._nodes.keys()):
@@ -192,10 +189,13 @@ class CurrentAwareStrategy(RoutingStrategy):
                 mid_lat = (edge.source.latitude + edge.destination.latitude) / 2
                 mid_lon = (edge.source.longitude + edge.destination.longitude) / 2
                 key = self._grid_key(mid_lat, mid_lon)
+
                 if key in self._current_data:
                     u, v = self._current_data[key]
                     edge.current_u = u
                     edge.current_v = v
+                if key in self._weather_data:
+                    edge.weather_penalty = float(self._weather_data[key])
 
     def calculate_route(
         self,
@@ -205,13 +205,50 @@ class CurrentAwareStrategy(RoutingStrategy):
         vessel: Optional[VesselConstraints] = None,
     ) -> Optional[List[Waypoint]]:
         """
-        Calculate a current-aware route.
-
-        1. Inject current data into graph edges.
-        2. Delegate to the base strategy for pathfinding.
-
-        The base strategy's A* will pick up the effective_weight
-        through the edge filter or directly, depending on the strategy.
+        Calculate a current- and weather-aware route by:
+          1. Annotating graph edges with current + weather data.
+          2. Asking A* to use effective_weight (the formula above).
         """
-        self._inject_currents(graph)
-        return self._base.calculate_route(graph, start_id, end_id, vessel)
+        self._inject_environment(graph)
+
+        speed = (
+            vessel.max_speed_knots
+            if vessel and vessel.max_speed_knots
+            else DEFAULT_SPEED_KNOTS
+        )
+
+        # The base strategy still applies its edge filters (vessel / zones);
+        # we just ask the graph to score edges via effective_weight.
+        if isinstance(self._base, EcoStrategy):
+            vessel_filter = _make_vessel_filter(vessel)
+            spatial_service = self._base.spatial_service
+            zone_cache: dict[tuple[str, str], bool] = {}
+
+            def eco_filter(edge: Edge) -> bool:
+                if vessel_filter is not None and not vessel_filter(edge):
+                    return False
+                key = (edge.source.node_id, edge.destination.node_id)
+                if key not in zone_cache:
+                    segment = [
+                        [edge.source.longitude, edge.source.latitude],
+                        [edge.destination.longitude, edge.destination.latitude],
+                    ]
+                    zone_cache[key] = not spatial_service.is_route_blocked(
+                        segment, vessel,
+                    )
+                return zone_cache[key]
+
+            return graph.find_path(
+                start_id, end_id,
+                edge_filter=eco_filter,
+                use_current_weights=True,
+                vessel_speed_knots=speed,
+            )
+
+        edge_filter = _make_vessel_filter(vessel)
+        return graph.find_path(
+            start_id, end_id,
+            edge_filter=edge_filter,
+            use_current_weights=True,
+            vessel_speed_knots=speed,
+        )

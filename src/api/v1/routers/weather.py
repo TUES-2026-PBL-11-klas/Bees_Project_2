@@ -25,8 +25,13 @@ router = APIRouter(prefix="/api/v1/weather", tags=["weather"])
 _MARINE_BASE = "https://marine-api.open-meteo.com/v1/marine"
 _WEATHER_BASE = "https://api.open-meteo.com/v1/forecast"
 
-# Fields we request from Open-Meteo
-_MARINE_HOURLY = [
+# Fields we request from Open-Meteo.
+#
+# Both the click widget and the regional cards now read from the same
+# `current=` endpoint so they always show identical values for the same
+# coordinate. We keep the hourly lists as a fallback when the upstream
+# response is missing the `current` block.
+_MARINE_FIELDS = [
     "wave_height",
     "wave_direction",
     "wave_period",
@@ -35,12 +40,16 @@ _MARINE_HOURLY = [
     "swell_wave_period",
 ]
 
-_WEATHER_HOURLY = [
+_WEATHER_FIELDS = [
     "wind_speed_10m",
     "wind_direction_10m",
     "temperature_2m",
     "weather_code",
 ]
+
+# Legacy aliases kept for tests / external imports.
+_MARINE_HOURLY = _MARINE_FIELDS
+_WEATHER_HOURLY = _WEATHER_FIELDS
 
 _TIMEOUT = 8.0  # seconds
 
@@ -80,15 +89,59 @@ def _get_client() -> httpx.AsyncClient:
 
 
 def _pick_current_values(hourly: dict, fields: list[str]) -> dict:
-    """Return the first (most-current) hourly value for each field."""
+    """
+    Return the value of each *field* at the current UTC hour.
+
+    Open-Meteo returns the full day starting at 00:00 UTC, so index 0 is
+    *not* "now" — it is midnight.  We match the current hour against the
+    ``time`` array and fall back to the first sample if anything is off.
+    """
+    import datetime as _dt
+
     out: dict = {}
+    times = hourly.get("time") if isinstance(hourly, dict) else None
+    idx = 0
+    if isinstance(times, list) and times:
+        now_hour = _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:00")
+        try:
+            idx = times.index(now_hour)
+        except ValueError:
+            # Fall back to the most recent past hour we have.
+            idx = 0
+            for i, t in enumerate(times):
+                if isinstance(t, str) and t <= now_hour:
+                    idx = i
+                else:
+                    break
+
     for field in fields:
         values = hourly.get(field)
         if isinstance(values, list) and values:
-            out[field] = values[0]
+            out[field] = values[idx] if idx < len(values) else values[-1]
         else:
             out[field] = None
     return out
+
+
+def _extract_current_block(payload: dict, fields: list[str]) -> dict:
+    """
+    Prefer Open-Meteo's ``current`` block (single value per field). Fall
+    back to the matching hourly index if the upstream omits it.
+    """
+    out: dict = {}
+    current = payload.get("current") if isinstance(payload, dict) else None
+    if isinstance(current, dict):
+        for field in fields:
+            out[field] = current.get(field)
+        # Pick up anything still missing from the hourly fallback.
+        missing = [f for f in fields if out.get(f) is None]
+        if missing:
+            hourly = payload.get("hourly", {}) or {}
+            out.update(_pick_current_values(hourly, missing))
+        return out
+
+    hourly = payload.get("hourly", {}) or {}
+    return _pick_current_values(hourly, fields)
 
 
 def _weather_code_label(code: Optional[int]) -> str:
@@ -127,14 +180,18 @@ async def _fetch_point_weather(lat: float, lon: float) -> dict:
     marine_params = {
         "latitude": lat,
         "longitude": lon,
-        "hourly": ",".join(_MARINE_HOURLY),
+        "current": ",".join(_MARINE_FIELDS),
+        "hourly": ",".join(_MARINE_FIELDS),
         "forecast_days": 1,
+        "timezone": "UTC",
     }
     weather_params = {
         "latitude": lat,
         "longitude": lon,
-        "hourly": ",".join(_WEATHER_HOURLY),
+        "current": ",".join(_WEATHER_FIELDS),
+        "hourly": ",".join(_WEATHER_FIELDS),
         "forecast_days": 1,
+        "timezone": "UTC",
     }
 
     marine_resp, weather_resp = await _parallel_get(
@@ -145,12 +202,10 @@ async def _fetch_point_weather(lat: float, lon: float) -> dict:
     result: dict = {"lat": lat, "lon": lon}
 
     if marine_resp:
-        hourly = marine_resp.get("hourly", {})
-        result.update(_pick_current_values(hourly, _MARINE_HOURLY))
+        result.update(_extract_current_block(marine_resp, _MARINE_FIELDS))
 
     if weather_resp:
-        hourly = weather_resp.get("hourly", {})
-        atmo = _pick_current_values(hourly, _WEATHER_HOURLY)
+        atmo = _extract_current_block(weather_resp, _WEATHER_FIELDS)
         result.update(atmo)
         result["weather_label"] = _weather_code_label(atmo.get("weather_code"))
 

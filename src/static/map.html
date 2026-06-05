@@ -648,6 +648,37 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
               </div>
             </div>
           </div>
+          <div id="navResult" style="display:none;flex-direction:column;gap:6px">
+            <div class="section-label">Navigation</div>
+            <div class="route-result">
+              <div class="route-stat"><span class="route-stat-label">Status</span><span class="route-stat-val" id="nav-status">Idle</span></div>
+              <div class="route-stat"><span class="route-stat-label">Position</span><span class="route-stat-val" id="nav-pos" style="font-size:9px">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Speed</span><span class="route-stat-val" id="nav-speed">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Heading</span><span class="route-stat-val" id="nav-heading">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Progress</span><span class="route-stat-val" id="nav-progress">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Next waypoint</span><span class="route-stat-val" id="nav-next">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">ETA</span><span class="route-stat-val" id="nav-eta">—</span></div>
+            </div>
+          </div>
+          <div id="rerouteResult" style="display:none;flex-direction:column;gap:6px">
+            <div class="section-label">AI Reroute</div>
+            <div class="route-result">
+              <div class="route-stat"><span class="route-stat-label">Status</span><span class="route-stat-val" id="rr-status">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Δ Distance</span><span class="route-stat-val" id="rr-dist">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Δ Duration</span><span class="route-stat-val" id="rr-dur">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Δ Fuel</span><span class="route-stat-val" id="rr-fuel">—</span></div>
+              <div class="route-stat" style="margin-top:4px"><span class="route-stat-label" style="font-size:10px" id="rr-reco">—</span></div>
+              <div style="display:flex;gap:6px;margin-top:6px">
+                <button class="btn btn-primary btn-sm" style="flex:1" onclick="applyAiReroute()" id="applyRerouteBtn" disabled>Apply alternative</button>
+                <button class="btn btn-ghost btn-sm" style="flex:1" onclick="dismissAiReroute()">Dismiss</button>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-primary btn-sm" style="flex:1" onclick="startNavigation()" id="startNavBtn">Start</button>
+            <button class="btn btn-ghost btn-sm" style="flex:1;display:none" onclick="stopNavigation()" id="stopNavBtn">Stop</button>
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="requestAiReroute()" id="aiRerouteBtn">AI reroute</button>
+          </div>
           <button class="btn btn-ghost btn-sm" onclick="clearRoute()">Clear route</button>
         </div>
         <div class="divider"></div>
@@ -779,6 +810,9 @@ let regionWeatherTimer = null;
 let currentsLayer = null;
 let currentsVisible = false;
 let weatherMarkersLayer = null;
+let currentRouteData = null;        // last computed route (with waypoints + _id + vessel_id)
+let navigationState = null;         // active GPS-tracking session
+let aiRerouteSuggestion = null;     // last AI reroute suggestion
 
 function notify(msg, type = 'ok') {
   const n = document.getElementById('notif');
@@ -3012,6 +3046,9 @@ function displayRoute(route) {
   routeLayer.clearLayers();
   const wps = (route.waypoints||[]).sort((a,b)=>a.sequence-b.sequence);
   if (!wps.length) return;
+  currentRouteData = { ...route, waypoints: wps };
+  stopNavigation(true);
+  dismissAiReroute(true);
   const coords = wps.map(w => [w.coordinates[1], w.coordinates[0]]);
   const segments = splitRouteSegments(coords);
   const allCoords = [];
@@ -3071,13 +3108,316 @@ function displayRoute(route) {
 }
 
 function clearRoute() {
+  stopNavigation(true);
+  dismissAiReroute(true);
   routeLayer.clearLayers();
+  currentRouteData = null;
   document.getElementById('routeResult').style.display='none';
   document.getElementById('routeWeatherResult').style.display='none';
   document.getElementById('routeCurrentResult').style.display='none';
   if (currentsLayer && map.hasLayer(currentsLayer)) {
     map.removeLayer(currentsLayer);
   }
+}
+
+/* ── Real-time GPS navigation ─────────────────────────────────────── */
+
+function _routeLineString() {
+  if (!currentRouteData || !currentRouteData.waypoints) return null;
+  const coords = currentRouteData.waypoints
+    .filter(w => w.coordinates && w.coordinates.length >= 2)
+    .map(w => [w.coordinates[0], w.coordinates[1]]); // turf wants [lon, lat]
+  if (coords.length < 2) return null;
+  return turf.lineString(coords);
+}
+
+function _shipIcon(headingDeg) {
+  return L.divIcon({
+    className: 'ship-marker-icon',
+    html: `<div style="
+      width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+      transform:rotate(${headingDeg||0}deg);transition:transform 0.3s ease;
+    ">
+      <svg viewBox="0 0 24 24" width="22" height="22"
+           style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6));color:#fbbf24">
+        <polygon points="12,2 18,20 12,16 6,20" fill="currentColor"
+                 stroke="#0b1120" stroke-width="1.2" stroke-linejoin="round"/>
+      </svg>
+    </div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+}
+
+function _haversineNm(a, b) {
+  // a, b: [lon, lat]
+  const R = 3440.065; // NM
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b[1] - a[1]);
+  const dLon = toRad(b[0] - a[0]);
+  const lat1 = toRad(a[1]);
+  const lat2 = toRad(b[1]);
+  const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function startNavigation() {
+  if (!currentRouteData || !currentRouteData.waypoints || currentRouteData.waypoints.length < 2) {
+    notify('Calculate a route first.', 'err');
+    return;
+  }
+  if (!('geolocation' in navigator)) {
+    notify('Geolocation not supported by this browser.', 'err');
+    return;
+  }
+  if (navigationState) return;
+
+  const line = _routeLineString();
+  if (!line) {
+    notify('Route has no valid coordinates.', 'err');
+    return;
+  }
+
+  const shipMarker = L.marker([0, 0], {
+    pane: 'routePane',
+    icon: _shipIcon(0),
+    zIndexOffset: 1000,
+  }).addTo(routeLayer);
+
+  navigationState = {
+    watchId: null,
+    line,
+    shipMarker,
+    lastFix: null,
+    startedAt: Date.now(),
+    totalLengthNm: turf.length(line, { units: 'kilometers' }) / 1.852,
+  };
+
+  document.getElementById('startNavBtn').style.display = 'none';
+  const stopBtn = document.getElementById('stopNavBtn');
+  stopBtn.style.display = 'block';
+  document.getElementById('navResult').style.display = 'flex';
+  document.getElementById('nav-status').textContent = 'Acquiring GPS…';
+
+  navigationState.watchId = navigator.geolocation.watchPosition(
+    updateNavigation,
+    (err) => {
+      console.error('Geolocation error:', err);
+      document.getElementById('nav-status').textContent = `GPS error (${err.code})`;
+      notify('GPS error: ' + (err.message || 'permission denied'), 'err');
+    },
+    { enableHighAccuracy: true, maximumAge: 2000, timeout: 15000 },
+  );
+}
+
+function stopNavigation(silent = false) {
+  if (!navigationState) return;
+  if (navigationState.watchId != null) {
+    navigator.geolocation.clearWatch(navigationState.watchId);
+  }
+  if (navigationState.shipMarker && routeLayer.hasLayer(navigationState.shipMarker)) {
+    routeLayer.removeLayer(navigationState.shipMarker);
+  }
+  navigationState = null;
+  document.getElementById('startNavBtn').style.display = 'block';
+  document.getElementById('stopNavBtn').style.display = 'none';
+  document.getElementById('navResult').style.display = 'none';
+  if (!silent) notify('Navigation stopped');
+}
+
+function updateNavigation(pos) {
+  if (!navigationState) return;
+  const lon = pos.coords.longitude;
+  const lat = pos.coords.latitude;
+  const speedMs = pos.coords.speed;       // may be null
+  const headingGps = pos.coords.heading;  // may be null
+  const here = turf.point([lon, lat]);
+  const snapped = turf.nearestPointOnLine(navigationState.line, here, { units: 'kilometers' });
+  const snappedCoords = snapped.geometry.coordinates;
+
+  // Heading from last fix → this fix (more reliable on stationary tests than pos.heading).
+  let heading = headingGps;
+  if (heading == null && navigationState.lastFix) {
+    const dy = lat - navigationState.lastFix.lat;
+    const dx = lon - navigationState.lastFix.lon;
+    heading = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+  }
+  if (heading == null) heading = 0;
+
+  navigationState.shipMarker
+    .setLatLng([snappedCoords[1], snappedCoords[0]])
+    .setIcon(_shipIcon(heading));
+
+  // Recenter without thrashing if user is panning manually.
+  if (!navigationState.lastFix) {
+    map.flyTo([snappedCoords[1], snappedCoords[0]], Math.max(map.getZoom(), 7), { duration: 0.8 });
+  } else {
+    const bounds = map.getBounds().pad(-0.25);
+    if (!bounds.contains([snappedCoords[1], snappedCoords[0]])) {
+      map.panTo([snappedCoords[1], snappedCoords[0]], { animate: true });
+    }
+  }
+
+  // Progress / next waypoint / ETA.
+  const traveledKm = snapped.properties.location || 0;
+  const traveledNm = traveledKm / 1.852;
+  const totalNm = navigationState.totalLengthNm || 0;
+  const remainingNm = Math.max(0, totalNm - traveledNm);
+  const pct = totalNm > 0 ? Math.min(100, (traveledNm / totalNm) * 100) : 0;
+
+  let nextLabel = '—';
+  let nextNm = null;
+  for (const wp of currentRouteData.waypoints) {
+    if (!wp.coordinates) continue;
+    const d = _haversineNm([lon, lat], wp.coordinates);
+    if (d > 0.05) {
+      nextLabel = wp.name || `WP ${wp.sequence}`;
+      nextNm = d;
+      break;
+    }
+  }
+
+  const speedKn = speedMs != null ? speedMs * 1.94384 : null;
+  let etaTxt = '—';
+  if (speedKn && speedKn > 0.1) {
+    const hours = remainingNm / speedKn;
+    const eta = new Date(Date.now() + hours * 3600 * 1000);
+    etaTxt = eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  document.getElementById('nav-status').textContent = 'Tracking';
+  document.getElementById('nav-pos').textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+  document.getElementById('nav-speed').textContent = speedKn != null ? `${speedKn.toFixed(1)} kn` : '— kn';
+  document.getElementById('nav-heading').textContent = `${heading.toFixed(0)}°`;
+  document.getElementById('nav-progress').textContent = `${pct.toFixed(1)}% (${remainingNm.toFixed(1)} NM left)`;
+  document.getElementById('nav-next').textContent = nextNm != null ? `${nextLabel} · ${nextNm.toFixed(1)} NM` : nextLabel;
+  document.getElementById('nav-eta').textContent = etaTxt;
+
+  navigationState.lastFix = { lat, lon, t: Date.now() };
+}
+
+/* ── AI Reroute ───────────────────────────────────────────────────── */
+
+function _extractRouteVesselId() {
+  if (!currentRouteData) return null;
+  const v = currentRouteData.vessel_id;
+  if (!v) return null;
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return v.$oid || v._id || null;
+  return null;
+}
+
+async function requestAiReroute() {
+  if (!currentRouteData) {
+    notify('Calculate a route first.', 'err');
+    return;
+  }
+  const vesselId = selectedRouteVesselId
+    || document.getElementById('vesselSelect').value
+    || _extractRouteVesselId();
+  if (!vesselId || vesselId.length < 12) {
+    notify('Select a real vessel in the Route panel before requesting AI rerouting.', 'err');
+    return;
+  }
+
+  const btn = document.getElementById('aiRerouteBtn');
+  btn.disabled = true;
+  const oldText = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span> Reroute…';
+
+  // Use the live GPS fix if we have one; otherwise leave undefined.
+  let currentPosition;
+  if (navigationState && navigationState.lastFix) {
+    currentPosition = [navigationState.lastFix.lon, navigationState.lastFix.lat];
+  }
+
+  try {
+    const resp = await fetch('/api/v1/ai/reroute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        vessel_id: vesselId,
+        reason: 'manual_evaluation',
+        current_position: currentPosition,
+        force: false,
+      }),
+    });
+
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.detail || data.message || 'Reroute failed');
+    }
+    renderAiReroute(data);
+  } catch (e) {
+    notify(e.message || 'Reroute failed', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = oldText;
+  }
+}
+
+function renderAiReroute(data) {
+  aiRerouteSuggestion = data;
+  const panel = document.getElementById('rerouteResult');
+  panel.style.display = 'flex';
+
+  const d = data.deltas || {};
+  document.getElementById('rr-status').textContent = data.status || '—';
+  document.getElementById('rr-dist').textContent = d.distance_nm != null ? `${d.distance_nm.toFixed(1)} NM` : '—';
+  document.getElementById('rr-dur').textContent = d.duration_h != null ? `${d.duration_h.toFixed(2)} h` : '—';
+  document.getElementById('rr-fuel').textContent = d.fuel_tons != null ? `${d.fuel_tons.toFixed(2)} t` : '—';
+  document.getElementById('rr-reco').textContent = data.recommendation || '—';
+
+  const wps = data.new_waypoints || [];
+  const applyBtn = document.getElementById('applyRerouteBtn');
+  applyBtn.disabled = !(data.status === 'suggested' && wps.length >= 2);
+
+  // Draw the alternative as a dashed amber polyline overlay.
+  if (window._aiReroutePolyline && routeLayer.hasLayer(window._aiReroutePolyline)) {
+    routeLayer.removeLayer(window._aiReroutePolyline);
+  }
+  if (wps.length >= 2) {
+    const latlngs = wps.map(w => [w.coordinates[1], w.coordinates[0]]);
+    window._aiReroutePolyline = L.polyline(latlngs, {
+      pane: 'routePane',
+      color: '#fbbf24',
+      weight: 3,
+      opacity: 0.95,
+      dashArray: '6 6',
+    }).addTo(routeLayer);
+  }
+
+  if (data.status === 'suggested') {
+    notify('AI suggested a reroute — review the panel.');
+  } else {
+    notify('Current route is already optimal.');
+  }
+}
+
+function applyAiReroute() {
+  if (!aiRerouteSuggestion || !aiRerouteSuggestion.new_waypoints) return;
+  const newRoute = {
+    ...currentRouteData,
+    waypoints: aiRerouteSuggestion.new_waypoints,
+    total_distance_nm: aiRerouteSuggestion.new_route?.total_distance_nm,
+    estimated_duration_h: aiRerouteSuggestion.new_route?.estimated_duration_h,
+    estimated_fuel_tons: aiRerouteSuggestion.new_route?.estimated_fuel_tons,
+    route_mode: 'ai-reroute',
+  };
+  displayRoute(newRoute);
+  fetchRouteWeather(newRoute.waypoints);
+  fetchRouteCurrents(newRoute.waypoints);
+  notify('AI alternative applied as the active route.');
+}
+
+function dismissAiReroute(silent = false) {
+  aiRerouteSuggestion = null;
+  document.getElementById('rerouteResult').style.display = 'none';
+  if (window._aiReroutePolyline && routeLayer && routeLayer.hasLayer(window._aiReroutePolyline)) {
+    routeLayer.removeLayer(window._aiReroutePolyline);
+  }
+  window._aiReroutePolyline = null;
+  if (!silent) notify('Suggestion dismissed');
 }
 
 initMap();
