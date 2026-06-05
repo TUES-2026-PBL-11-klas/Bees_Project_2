@@ -10,6 +10,38 @@ class RerouteRequest(BaseModel):
     current_position: Optional[List[float]] = None
 
 
+class GenerateRecommendationsRequest(BaseModel):
+    """POST /ai/recommendations/generate request body."""
+    vessel_id: Optional[str] = None
+    company_id: Optional[str] = None
+
+
+class ApplyRerouteRequest(BaseModel):
+    """POST /ai/reroute/apply request body."""
+    route_id: str
+    new_waypoints: List[Dict[str, Any]]
+    new_stats: Optional[Dict[str, Any]] = None
+
+
+class ReroutePreviewRequest(BaseModel):
+    """
+    POST /ai/reroute/preview request body.
+
+    Stateless reroute evaluation: re-runs the routing strategy with
+    current + weather awareness against the same origin/destination as
+    the user's *active* route on the map, then compares to the supplied
+    stats.  Does *not* need a DB-backed vessel or persisted route.
+    """
+    start_node_id: str
+    end_node_id: str
+    optimization_mode: str = "fastest"
+    vessel_id: Optional[str] = None
+    vessel_type: Optional[str] = None
+    current_position: Optional[List[float]] = None
+    current_stats: Optional[Dict[str, float]] = None
+    reason: Optional[str] = None
+
+
 class RerouteResponse(BaseModel):
     """Response returned after a reroute evaluation."""
     reroute_id: str

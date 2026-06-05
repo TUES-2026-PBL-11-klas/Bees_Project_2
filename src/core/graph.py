@@ -55,6 +55,10 @@ class Edge:
         is_blocked:   When ``True`` the edge is treated as impassable.
         max_draft_m:  Maximum vessel draft (in metres) allowed on this
                       passage.  ``None`` means no restriction.
+        current_u:    East-west ocean current component (m/s, positive = east).
+        current_v:    North-south ocean current component (m/s, positive = north).
+        weather_penalty: Multiplicative penalty derived from wave height /
+                      wind speed at the edge midpoint.  Zero means calm.
     """
     source: Waypoint
     destination: Waypoint
@@ -63,6 +67,9 @@ class Edge:
     max_draft_m: Optional[float] = None
     max_length_m: Optional[float] = None
     max_beam_m: Optional[float] = None
+    current_u: float = 0.0
+    current_v: float = 0.0
+    weather_penalty: float = 0.0
 
     def __post_init__(self) -> None:
         self.weight = self.source.distance_to(self.destination)
@@ -74,6 +81,57 @@ class Edge:
     def unblock(self) -> None:
         """Remove the impassable flag."""
         self.is_blocked = False
+
+    def current_boost(self, vessel_speed_knots: float = 14.0) -> float:
+        """
+        Return the *signed* effective-distance reduction (metres) earned
+        from the ocean current along this edge.
+
+        Positive value = favourable current that shortens the edge.
+        Negative value = opposing current that lengthens it.
+        """
+        if self.current_u == 0.0 and self.current_v == 0.0:
+            return 0.0
+
+        dlat = self.destination.latitude - self.source.latitude
+        dlon = self.destination.longitude - self.source.longitude
+        heading_rad = math.atan2(dlon, dlat)
+
+        current_along = (
+            self.current_u * math.sin(heading_rad)
+            + self.current_v * math.cos(heading_rad)
+        )
+
+        vessel_speed_ms = vessel_speed_knots * 0.514444
+        if vessel_speed_ms <= 0:
+            return 0.0
+
+        # boost ≈ weight * (current_along / vessel_speed_ms),
+        # clamped so a single edge can't shrink below 50% of its distance.
+        boost = self.weight * (current_along / vessel_speed_ms)
+        return max(-self.weight, min(self.weight * 0.5, boost))
+
+    def effective_weight(
+        self,
+        vessel_speed_knots: float = 14.0,
+    ) -> float:
+        """
+        Return the edge cost using the unified formula::
+
+            Cost = DistanceWeight + WeatherPenalty - CurrentBoost
+
+        where ``DistanceWeight`` is the haversine length in metres,
+        ``WeatherPenalty`` adds extra cost in rough seas / strong winds,
+        and ``CurrentBoost`` rewards edges aligned with the current.
+
+        The result is clamped to ``[0.5 * weight, 3.0 * weight]`` so a
+        single edge cannot dominate or vanish from the search space.
+        """
+        boost = self.current_boost(vessel_speed_knots)
+        penalty = max(0.0, self.weather_penalty) * self.weight
+
+        cost = self.weight + penalty - boost
+        return max(self.weight * 0.5, min(self.weight * 3.0, cost))
 
 class NavigationGraph:
     """
@@ -165,6 +223,8 @@ class NavigationGraph:
         origin_id: str,
         destination_id: str,
         edge_filter=None,
+        use_current_weights: bool = False,
+        vessel_speed_knots: float = 14.0,
     ) -> Optional[list[Waypoint]]:
         """
         Find the shortest unblocked path between two waypoints using A*.
@@ -217,7 +277,12 @@ class NavigationGraph:
                 if neighbour_id in closed:
                     continue
 
-                tentative_g = g_score[current_id] + edge.weight
+                edge_cost = (
+                    edge.effective_weight(vessel_speed_knots)
+                    if use_current_weights
+                    else edge.weight
+                )
+                tentative_g = g_score[current_id] + edge_cost
 
                 if tentative_g < g_score.get(neighbour_id, math.inf):
                     g_score[neighbour_id] = tentative_g

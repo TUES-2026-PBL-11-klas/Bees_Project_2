@@ -25,6 +25,8 @@ async def lifespan(app: FastAPI):
     logger.info("AI module initialised (observer + WebSocket manager)")
     yield
     close_db()
+    from src.api.v1.routers.weather import _close_client
+    await _close_client()
 
 app = FastAPI(title="ClearWake Routing", lifespan=lifespan)
 

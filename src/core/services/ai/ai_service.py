@@ -95,6 +95,47 @@ class AIService:
             limit=limit,
         )
 
+    def generate_recommendations(
+        self,
+        vessel_id: Optional[str] = None,
+        company_id: Optional[str] = None,
+    ) -> list:
+        """Run every generator + persist the new recommendations."""
+        if not vessel_id and not company_id:
+            raise ValueError("vessel_id or company_id is required")
+        return self._recommendation_engine.generate_all(
+            vessel_id=vessel_id,
+            company_id=company_id,
+        )
+
+    def apply_reroute(
+        self,
+        route_id: str,
+        new_waypoints: list[dict],
+        new_stats: Optional[dict] = None,
+    ) -> Optional[dict]:
+        """
+        Persist an accepted reroute by replacing the Route's waypoints and
+        stats. Returns the updated route as a dict, or None if not found.
+        """
+        if not new_waypoints:
+            raise ValueError("new_waypoints is required and must be non-empty")
+
+        update_data: dict = {"waypoints": new_waypoints}
+        if new_stats:
+            for key in ("total_distance_nm", "estimated_duration_h", "estimated_fuel_tons"):
+                if key in new_stats and new_stats[key] is not None:
+                    update_data[key] = new_stats[key]
+
+        updated = self._route_repo.update(route_id, update_data)
+        if updated is None:
+            return None
+
+        import json
+        result = json.loads(updated.to_json())
+        result["applied_at"] = datetime.utcnow().isoformat()
+        return result
+
     # ------------------------------------------------------------------
     # Anomaly detection
     # ------------------------------------------------------------------

@@ -1,9 +1,25 @@
+from datetime import datetime
+
 from src.models.zone import Zone
+
+
+def _zone_is_currently_active(zone: Zone, now: datetime) -> bool:
+    """True if status==active AND now is inside any valid_from / valid_until window."""
+    if getattr(zone, "status", None) != "active":
+        return False
+    valid_from = getattr(zone, "valid_from", None)
+    valid_until = getattr(zone, "valid_until", None)
+    if valid_from is not None and now < valid_from:
+        return False
+    if valid_until is not None and now > valid_until:
+        return False
+    return True
 
 
 class ZoneSpatialService:
     def get_zones_intersecting_point(self, longitude: float, latitude: float) -> list[Zone]:
-        return list(
+        now = datetime.utcnow()
+        candidates = list(
             Zone.objects(
                 geometry__geo_intersects={
                     "type": "Point",
@@ -12,9 +28,11 @@ class ZoneSpatialService:
                 status="active",
             )
         )
+        return [z for z in candidates if _zone_is_currently_active(z, now)]
 
     def get_zones_intersecting_route(self, coordinates: list[list[float]]) -> list[Zone]:
-        return list(
+        now = datetime.utcnow()
+        candidates = list(
             Zone.objects(
                 geometry__geo_intersects={
                     "type": "LineString",
@@ -23,6 +41,7 @@ class ZoneSpatialService:
                 status="active",
             )
         )
+        return [z for z in candidates if _zone_is_currently_active(z, now)]
 
     def is_point_in_any_zone(self, longitude: float, latitude: float) -> bool:
         return self.get_zones_intersecting_point(longitude, latitude) != []

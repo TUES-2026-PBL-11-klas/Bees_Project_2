@@ -18,6 +18,7 @@ from src.core.routing.strategy import (
     METRES_PER_NM,
 )
 from src.infrastructure.repositories.route_repository import RouteRepository
+from src.infrastructure.repositories.route_history_repository import RouteHistoryRepository
 from src.core.graph_builder import build_navigation_graph
 from src.core.ports import resolve_port, list_all_ports
 
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/routes", tags=["routes"])
 repo = RouteRepository()
+history_repo = RouteHistoryRepository()
 
 
 
@@ -54,6 +56,7 @@ _FUEL_MULTIPLIERS: dict[str, float] = {
 
 _GRAPH = build_navigation_graph()
 _LAND_MASK_PATH = Path(__file__).resolve().parents[4] / "ne_50m_land.geojson"
+_LAND_MASK_CACHE: Optional[bytes] = None
 
 
 
@@ -169,12 +172,16 @@ def get_available_ports():
 
 @router.get("/landmask")
 def get_landmask_geojson():
-    if not _LAND_MASK_PATH.exists():
-        raise HTTPException(status_code=404, detail="Land mask file is missing")
-    return FileResponse(
-        _LAND_MASK_PATH,
+    global _LAND_MASK_CACHE
+    if _LAND_MASK_CACHE is None:
+        if not _LAND_MASK_PATH.exists():
+            raise HTTPException(status_code=404, detail="Land mask file is missing")
+        _LAND_MASK_CACHE = _LAND_MASK_PATH.read_bytes()
+    from fastapi.responses import Response
+    return Response(
+        content=_LAND_MASK_CACHE,
         media_type="application/geo+json",
-        filename="ne_50m_land.geojson",
+        headers={"Cache-Control": "public, max-age=86400"},
     )
 
 
@@ -240,6 +247,25 @@ def calculate_route(request: RouteCalculationSchema):
     try:
         created_route = repo.create(route_data)
         result = json.loads(created_route.to_json())
+
+        # Persist a RouteHistory snapshot for analytics / audit trail
+        try:
+            history_data = {
+                "route_id": created_route.id,
+                "vessel_id": route_data["vessel_id"],
+                "company_id": route_data["company_id"],
+                "origin_port": start_id,
+                "destination_port": end_id,
+                "optimization_mode": request.optimization_mode,
+                "total_distance_nm": stats["total_distance_nm"],
+                "estimated_duration_h": stats["estimated_duration_h"],
+                "estimated_fuel_tons": stats["estimated_fuel_tons"],
+                "waypoint_count": len(waypoints),
+                "status": "completed",
+            }
+            history_repo.create(history_data)
+        except Exception as hist_exc:
+            logger.warning("Could not persist route history: %s", hist_exc)
     except Exception as exc:
         logger.warning("Could not persist route to DB: %s", exc)
         result = {"_id": None, "waypoints": waypoints}
@@ -253,6 +279,20 @@ def calculate_route(request: RouteCalculationSchema):
     result["end_port"] = end_id
 
     return result
+
+
+@router.get("/history")
+def get_route_history(limit: int = 50):
+    """Return the most recent route-history entries."""
+    entries = history_repo.get_recent(limit=limit)
+    return [json.loads(e.to_json()) for e in entries]
+
+
+@router.get("/history/{vessel_id}")
+def get_route_history_by_vessel(vessel_id: str, limit: int = 50):
+    """Return route-history entries for a specific vessel."""
+    entries = history_repo.get_by_vessel(vessel_id, limit=limit)
+    return [json.loads(e.to_json()) for e in entries]
 
 
 @router.get("/{route_id}")

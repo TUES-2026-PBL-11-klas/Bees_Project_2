@@ -32,3 +32,5 @@ from src.models.ai_models import (
     AIRecommendation,
     ETAPrediction,
 )
+from src.models.route_history import RouteHistory
+from src.models.port_scheduling import Port, PortSchedule, DockReservation

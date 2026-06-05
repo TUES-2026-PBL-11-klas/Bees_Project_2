@@ -3,153 +3,567 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>ClearWake Routing</title>
+<title>ClearWake — Maritime Route Optimization</title>
+<meta name="description" content="Intelligent maritime route optimization with real-time weather, zone avoidance, and vessel-aware planning."/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7.1.0/turf.min.js"></script>
 <style>
+/* ── Design Tokens ─────────────────────────────────────────────────── */
 :root {
-  --ocean: #07111f;
-  --surface: #0d1e33;
-  --surface2: #132540;
-  --border: rgba(56,189,248,0.12);
-  --border2: rgba(56,189,248,0.22);
-  --accent: #38bdf8;
-  --accent2: #0ea5e9;
-  --danger: #f43f5e;
-  --success: #22c55e;
-  --warn: #f59e0b;
-  --text: #e2e8f0;
-  --muted: #64748b;
-  --mono: 'Space Mono', monospace;
-  --sans: 'DM Sans', sans-serif;
-  --sidebar: 320px;
+  --bg-primary: #0b1120;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1a2332;
+  --bg-elevated: rgba(23, 35, 55, 0.85);
+  --bg-glass: rgba(17, 24, 39, 0.72);
+  --border-subtle: rgba(148, 163, 184, 0.08);
+  --border-default: rgba(148, 163, 184, 0.12);
+  --border-hover: rgba(148, 163, 184, 0.2);
+  --accent: #60a5fa;
+  --accent-dim: #3b82f6;
+  --accent-glow: rgba(96, 165, 250, 0.15);
+  --accent-subtle: rgba(96, 165, 250, 0.08);
+  --danger: #fb7185;
+  --danger-dim: rgba(251, 113, 133, 0.12);
+  --success: #4ade80;
+  --success-dim: rgba(74, 222, 128, 0.12);
+  --warn: #fbbf24;
+  --warn-dim: rgba(251, 191, 36, 0.12);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Inter', -apple-system, sans-serif;
+  --sidebar-w: 300px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --transition: 180ms ease;
 }
+
+/* ── Reset & Base ──────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { width: 100%; height: 100%; overflow: hidden; background: var(--ocean); font-family: var(--sans); color: var(--text); }
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-primary); font-family: var(--sans); color: var(--text-primary); -webkit-font-smoothing: antialiased; }
+
+/* ── Layout ────────────────────────────────────────────────────────── */
 .app { display: flex; width: 100%; height: 100vh; }
-.sidebar { width: var(--sidebar); flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; z-index: 1000; }
-.map-wrap { flex: 1; position: relative; overflow: hidden; }
-#map { width: 100%; height: 100%; background: var(--ocean); }
-.sidebar-header { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-.brand-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
-.brand-name { font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; }
-.brand-sub { font-size: 11px; color: var(--muted); font-family: var(--mono); letter-spacing: 0.04em; }
-.tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.tab { flex: 1; padding: 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-family: var(--mono); color: var(--muted); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
-.tab:hover { color: var(--text); }
-.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-.sidebar-content { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
-.sidebar-content::-webkit-scrollbar { width: 4px; }
-.sidebar-content::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-.panel { display: none; flex-direction: column; gap: 16px; }
-.panel.active { display: flex; }
-.section-label { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field label { font-size: 12px; color: var(--muted); font-weight: 500; }
-.field input, .field select { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 12px; font-family: var(--mono); color: var(--text); width: 100%; outline: none; transition: border-color 0.15s; }
-.field input:focus, .field select:focus { border-color: var(--accent); }
-.field select option { background: var(--surface2); }
-.hint { font-size: 11px; color: var(--muted); line-height: 1.5; }
-.strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.strategy-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: all 0.15s; text-align: center; }
-.strategy-card:hover { border-color: var(--border2); }
-.strategy-card.active { border-color: var(--accent); background: rgba(56,189,248,0.08); }
-.strategy-icon { font-size: 20px; margin-bottom: 6px; }
-.strategy-name { font-size: 11px; font-weight: 600; color: var(--text); font-family: var(--mono); }
-.strategy-desc { font-size: 10px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
-.btn { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; font-family: var(--mono); letter-spacing: 0.04em; cursor: pointer; border: none; transition: all 0.15s; width: 100%; }
-.btn-primary { background: var(--accent); color: #07111f; }
-.btn-primary:hover { background: var(--accent2); }
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
-.btn-ghost:hover { border-color: var(--border2); color: var(--text); }
-.btn-danger { background: transparent; color: var(--danger); border: 1px solid rgba(244,63,94,0.3); }
-.btn-danger:hover { background: rgba(244,63,94,0.1); }
-.btn-sm { padding: 6px 10px; font-size: 11px; }
-.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 600; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; }
-.badge-active { background: rgba(34,197,94,0.15); color: var(--success); }
-.badge-inactive { background: rgba(100,116,139,0.15); color: var(--muted); }
-.badge-eco { background: rgba(34,197,94,0.12); color: var(--success); }
-.badge-conflict { background: rgba(244,63,94,0.12); color: var(--danger); }
-.badge-canal { background: rgba(245,158,11,0.12); color: var(--warn); }
-.badge-temporary { background: rgba(56,189,248,0.12); color: var(--accent); }
-.zone-list { display: flex; flex-direction: column; gap: 8px; }
-.vessel-picker { display: flex; flex-direction: column; gap: 8px; }
-.vessel-card {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  cursor: pointer;
-  transition: all 0.15s;
+.sidebar {
+  width: var(--sidebar-w); flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-subtle);
+  display: flex; flex-direction: column;
+  overflow: hidden; z-index: 1000;
+  transition: width var(--transition);
 }
-.vessel-card:hover { border-color: var(--border2); }
-.vessel-card.active { border-color: var(--accent); background: rgba(56,189,248,0.08); }
-.vessel-card-title { font-size: 12px; font-weight: 600; color: var(--text); }
-.vessel-card-meta { font-size: 10px; color: var(--muted); font-family: var(--mono); display: flex; flex-wrap: wrap; gap: 6px; }
-.zone-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.map-wrap { flex: 1; position: relative; overflow: hidden; }
+#map { width: 100%; height: 100%; background: var(--bg-primary); }
+
+/* ── Sidebar Header ────────────────────────────────────────────────── */
+.sidebar-header {
+  padding: 20px 18px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(96,165,250,0.04) 0%, transparent 100%);
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-icon {
+  width: 30px; height: 30px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.brand-icon svg { width: 16px; height: 16px; color: var(--bg-primary); }
+.brand-name {
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  letter-spacing: 0.1em; color: var(--accent);
+  text-transform: uppercase;
+}
+.brand-sub { font-size: 10px; color: var(--text-muted); letter-spacing: 0.03em; margin-top: 1px; }
+
+/* ── Tabs ──────────────────────────────────────────────────────────── */
+.tabs { display: flex; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; padding: 0 4px; }
+.tab {
+  flex: 1; padding: 10px 4px 9px; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  font-family: var(--mono); color: var(--text-muted);
+  background: none; border: none; cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color var(--transition), border-color var(--transition);
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.tab svg { width: 12px; height: 12px; opacity: 0.6; transition: opacity var(--transition); }
+.tab:hover { color: var(--text-secondary); }
+.tab:hover svg { opacity: 0.8; }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab.active svg { opacity: 1; color: var(--accent); }
+
+/* ── Sidebar Content ───────────────────────────────────────────────── */
+.sidebar-content {
+  flex: 1; overflow-y: auto; padding: 14px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.sidebar-content::-webkit-scrollbar { width: 3px; }
+.sidebar-content::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 2px; }
+.sidebar-content::-webkit-scrollbar-track { background: transparent; }
+
+.panel { display: none; flex-direction: column; gap: 14px; animation: fadeIn 0.2s ease; }
+.panel.active { display: flex; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── Section Labels ────────────────────────────────────────────────── */
+.section-label {
+  font-family: var(--mono); font-size: 9px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 6px;
+}
+
+/* ── Fields ────────────────────────────────────────────────────────── */
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 11px; color: var(--text-secondary); font-weight: 500; }
+.field input, .field select {
+  background: var(--bg-tertiary); border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm); padding: 8px 10px;
+  font-size: 12px; font-family: var(--mono); color: var(--text-primary);
+  width: 100%; outline: none; transition: border-color var(--transition), box-shadow var(--transition);
+}
+.field input:focus, .field select:focus {
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+.field input::placeholder { color: var(--text-muted); }
+.field select option { background: var(--bg-tertiary); }
+
+/* ── Strategy Cards ────────────────────────────────────────────────── */
+.strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.strategy-card {
+  background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 12px 10px;
+  cursor: pointer; transition: all var(--transition);
+  text-align: center; position: relative; overflow: hidden;
+}
+.strategy-card::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--accent-glow); opacity: 0; transition: opacity var(--transition);
+}
+.strategy-card:hover { border-color: var(--border-hover); }
+.strategy-card:hover::before { opacity: 0.5; }
+.strategy-card.active { border-color: var(--accent-dim); }
+.strategy-card.active::before { opacity: 1; }
+.strategy-icon { margin-bottom: 4px; display: flex; justify-content: center; }
+.strategy-icon svg { width: 22px; height: 22px; color: var(--text-secondary); transition: color var(--transition); }
+.strategy-card.active .strategy-icon svg { color: var(--accent); }
+.strategy-name { font-size: 11px; font-weight: 600; color: var(--text-primary); font-family: var(--mono); position: relative; }
+.strategy-desc { font-size: 9px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; position: relative; }
+
+/* ── Buttons ───────────────────────────────────────────────────────── */
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 14px; border-radius: var(--radius-sm);
+  font-size: 11px; font-weight: 600; font-family: var(--mono);
+  letter-spacing: 0.03em; cursor: pointer; border: none;
+  transition: all var(--transition); width: 100%;
+}
+.btn-primary {
+  background: var(--accent-dim); color: #fff;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.3);
+}
+.btn-primary:hover { background: var(--accent); box-shadow: 0 2px 8px rgba(96, 165, 250, 0.3); }
+.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+.btn-ghost {
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+.btn-ghost:hover { border-color: var(--border-hover); color: var(--text-primary); background: var(--accent-subtle); }
+.btn-danger { background: transparent; color: var(--danger); border: 1px solid rgba(251,113,133,0.2); }
+.btn-danger:hover { background: var(--danger-dim); }
+.btn-sm { padding: 5px 9px; font-size: 10px; }
+
+/* ── Badges ────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: 99px;
+  font-size: 9px; font-weight: 600; font-family: var(--mono);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.badge-active { background: var(--success-dim); color: var(--success); }
+.badge-inactive { background: rgba(100,116,139,0.12); color: var(--text-muted); }
+.badge-eco { background: var(--success-dim); color: var(--success); }
+.badge-conflict { background: var(--danger-dim); color: var(--danger); }
+.badge-canal { background: var(--warn-dim); color: var(--warn); }
+.badge-temporary { background: var(--accent-subtle); color: var(--accent); }
+
+/* ── Zone / Vessel List Items ──────────────────────────────────────── */
+.zone-list { display: flex; flex-direction: column; gap: 6px; }
+.zone-item {
+  background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 10px 12px;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+  transition: border-color var(--transition);
+}
+.zone-item:hover { border-color: var(--border-hover); }
 .zone-item-info { flex: 1; min-width: 0; }
-.zone-item-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.zone-item-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
-.zone-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
-.route-result { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
-.route-stat { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 12px; }
-.route-stat-label { color: var(--muted); }
-.route-stat-val { font-family: var(--mono); color: var(--accent); font-weight: 700; }
-.divider { height: 1px; background: var(--border); }
-.notif { position: fixed; bottom: 20px; right: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; font-size: 12px; color: var(--text); font-family: var(--mono); max-width: 280px; z-index: 9999; transform: translateY(80px); opacity: 0; transition: all 0.3s; pointer-events: none; }
-.notif.show { transform: translateY(0); opacity: 1; }
-.notif.ok { border-color: rgba(34,197,94,0.4); color: var(--success); }
-.notif.err { border-color: rgba(244,63,94,0.4); color: var(--danger); }
-.empty { text-align: center; padding: 24px 16px; color: var(--muted); font-size: 12px; line-height: 1.6; }
-.map-status { position: absolute; bottom: 16px; left: 16px; background: rgba(13,30,51,0.88); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 11px; font-family: var(--mono); color: var(--muted); z-index: 999; backdrop-filter: blur(6px); pointer-events: none; }
-.leaflet-control-layers { background: rgba(13,30,51,0.9) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; color: var(--text) !important; }
-.leaflet-control-layers label { color: var(--muted) !important; font-size: 11px !important; font-family: var(--mono) !important; }
-.leaflet-control-zoom a { background: rgba(13,30,51,0.9) !important; border-color: var(--border) !important; color: var(--muted) !important; }
-.leaflet-control-zoom a:hover { background: var(--surface2) !important; color: var(--accent) !important; }
-.leaflet-bar { border: 1px solid var(--border) !important; border-radius: 8px !important; overflow: hidden; }
-.leaflet-popup-content-wrapper { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; color: var(--text) !important; font-family: var(--mono) !important; font-size: 12px !important; }
-.leaflet-popup-tip { background: var(--surface) !important; }
-.spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(56,189,248,0.3); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.toggle-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
-.toggle { position: relative; width: 36px; height: 20px; }
+.zone-item-name { font-size: 12px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zone-item-meta { display: flex; align-items: center; gap: 5px; margin-top: 4px; flex-wrap: wrap; }
+.zone-item-actions { display: flex; gap: 3px; flex-shrink: 0; }
+
+/* ── Vessel Picker ─────────────────────────────────────────────────── */
+.vessel-picker { display: flex; flex-direction: column; gap: 6px; }
+.vessel-card {
+  background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 4px;
+  cursor: pointer; transition: all var(--transition);
+}
+.vessel-card:hover { border-color: var(--border-hover); }
+.vessel-card.active { border-color: var(--accent-dim); background: var(--accent-subtle); }
+.vessel-card-title { font-size: 12px; font-weight: 500; color: var(--text-primary); }
+.vessel-card-meta { font-size: 10px; color: var(--text-muted); font-family: var(--mono); display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ── Route Result ──────────────────────────────────────────────────── */
+.route-result {
+  background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 12px; overflow: hidden;
+}
+.route-stat { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 11px; }
+.route-stat-label { color: var(--text-muted); font-weight: 400; }
+.route-stat-val { font-family: var(--mono); color: var(--accent); font-weight: 600; font-size: 11px; }
+
+/* ── Divider ───────────────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--border-subtle); }
+
+/* ── Toggle ────────────────────────────────────────────────────────── */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-secondary); }
+.toggle { position: relative; width: 32px; height: 18px; flex-shrink: 0; }
 .toggle input { opacity: 0; width: 0; height: 0; }
-.toggle-slider { position: absolute; inset: 0; background: var(--surface2); border: 1px solid var(--border); border-radius: 99px; cursor: pointer; transition: 0.2s; }
-.toggle-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 2px; top: 2px; background: var(--muted); border-radius: 50%; transition: 0.2s; }
-.toggle input:checked + .toggle-slider { background: rgba(56,189,248,0.2); border-color: var(--accent); }
-.toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: var(--accent); }
-.loading-overlay { position: absolute; inset: 0; background: rgba(7,17,31,0.7); display: flex; align-items: center; justify-content: center; z-index: 999; backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.toggle-slider {
+  position: absolute; inset: 0;
+  background: var(--bg-tertiary); border: 1px solid var(--border-default);
+  border-radius: 99px; cursor: pointer; transition: all 0.2s;
+}
+.toggle-slider::before {
+  content: ''; position: absolute; width: 12px; height: 12px;
+  left: 2px; top: 2px; background: var(--text-muted);
+  border-radius: 50%; transition: all 0.2s;
+}
+.toggle input:checked + .toggle-slider { background: var(--accent-glow); border-color: var(--accent-dim); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(14px); background: var(--accent); }
+
+/* ── Notification ──────────────────────────────────────────────────── */
+.notif {
+  position: fixed; bottom: 20px; right: 20px;
+  background: var(--bg-glass); backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  padding: 10px 16px; font-size: 12px; color: var(--text-primary);
+  font-family: var(--mono); max-width: 280px; z-index: 9999;
+  transform: translateY(80px); opacity: 0;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.notif.show { transform: translateY(0); opacity: 1; }
+.notif.ok { border-color: rgba(74,222,128,0.3); }
+.notif.err { border-color: rgba(251,113,133,0.3); }
+
+/* ── Weather Widget (glassmorphism) ────────────────────────────────── */
+.weather-widget {
+  position: absolute; top: 14px; right: 14px;
+  background: var(--bg-glass); backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg); padding: 14px 16px;
+  z-index: 998; min-width: 200px; max-width: 260px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  transform: translateY(-10px); opacity: 0;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.weather-widget.show { transform: translateY(0); opacity: 1; pointer-events: all; }
+.weather-widget-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.weather-widget-title {
+  font-family: var(--mono); font-size: 9px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted);
+}
+.weather-widget-close {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; padding: 2px; line-height: 1;
+  transition: color var(--transition);
+}
+.weather-widget-close:hover { color: var(--text-primary); }
+.weather-widget-close svg { width: 14px; height: 14px; }
+
+/* ── Rain Radar Legend ──────────────────────────────────────────────── */
+.radar-legend {
+  position: absolute; bottom: 14px; right: 14px;
+  background: var(--bg-glass); backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md); padding: 10px 14px;
+  z-index: 998; min-width: 170px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.radar-legend.show { opacity: 1; pointer-events: all; }
+.radar-legend-title {
+  font-family: var(--mono); font-size: 9px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 8px;
+}
+.radar-legend-bar {
+  height: 10px; border-radius: 4px;
+  background: linear-gradient(90deg,
+    rgba(120,120,190,0.2) 0%,
+    rgba(110,110,205,0.5) 15%,
+    rgba(80,180,80,0.6) 30%,
+    rgba(255,255,0,0.7) 50%,
+    rgba(255,160,0,0.8) 65%,
+    rgba(255,50,0,0.85) 80%,
+    rgba(180,0,180,0.9) 100%
+  );
+  margin-bottom: 4px;
+}
+.radar-legend-labels {
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: 8px;
+  color: var(--text-muted); letter-spacing: 0.02em;
+}
+.radar-legend-time {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--text-secondary); margin-top: 6px;
+  text-align: center;
+}
+.weather-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.weather-stat { display: flex; flex-direction: column; gap: 1px; }
+.weather-stat-label { font-size: 9px; color: var(--text-muted); font-weight: 500; }
+.weather-stat-value { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.weather-stat-unit { font-size: 9px; color: var(--text-muted); font-weight: 400; }
+.weather-condition {
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-subtle);
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-secondary);
+}
+.weather-condition svg { width: 16px; height: 16px; color: var(--accent); flex-shrink: 0; }
+.weather-loading {
+  text-align: center; padding: 8px 0;
+  font-family: var(--mono); font-size: 10px; color: var(--text-muted);
+}
+
+/* ── Route Weather Summary ─────────────────────────────────────────── */
+.route-weather {
+  background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 10px 12px;
+  margin-top: 2px;
+}
+.route-weather-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.route-weather-item { display: flex; flex-direction: column; gap: 1px; }
+.route-weather-label { font-size: 9px; color: var(--text-muted); }
+.route-weather-value { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text-primary); }
+
+/* ── Map Status ────────────────────────────────────────────────────── */
+.map-status {
+  position: absolute; bottom: 14px; left: 14px;
+  background: var(--bg-glass); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+  padding: 5px 10px; font-size: 10px; font-family: var(--mono);
+  color: var(--text-muted); z-index: 999; pointer-events: none;
+}
+
+/* ── Empty State ───────────────────────────────────────────────────── */
+.empty { text-align: center; padding: 20px 14px; color: var(--text-muted); font-size: 11px; line-height: 1.6; }
+.hint { font-size: 10px; color: var(--text-muted); line-height: 1.5; }
+
+/* ── Loading Overlay ───────────────────────────────────────────────── */
+.loading-overlay {
+  position: absolute; inset: 0;
+  background: rgba(11,17,32,0.65); backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 999; opacity: 0; pointer-events: none;
+  transition: opacity 0.25s;
+}
 .loading-overlay.show { opacity: 1; pointer-events: all; }
-.loading-box { text-align: center; color: var(--accent); font-family: var(--mono); font-size: 12px; }
-.loading-box .spinner { width: 24px; height: 24px; border-width: 3px; margin-bottom: 12px; }
+.loading-box { text-align: center; color: var(--accent); font-family: var(--mono); font-size: 11px; }
+.loading-box .spinner { width: 22px; height: 22px; border-width: 2px; margin-bottom: 10px; }
+
+/* ── Spinner ───────────────────────────────────────────────────────── */
+.spinner {
+  display: inline-block; width: 12px; height: 12px;
+  border: 2px solid var(--accent-glow); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Leaflet Overrides ─────────────────────────────────────────────── */
+.leaflet-control-layers {
+  background: var(--bg-glass) !important; backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--radius-md) !important; color: var(--text-primary) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
+}
+.leaflet-control-layers label { color: var(--text-secondary) !important; font-size: 11px !important; font-family: var(--sans) !important; }
+.leaflet-control-zoom a {
+  background: var(--bg-glass) !important; backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: var(--border-subtle) !important; color: var(--text-secondary) !important;
+  transition: all var(--transition) !important;
+}
+.leaflet-control-zoom a:hover { background: var(--bg-tertiary) !important; color: var(--accent) !important; }
+.leaflet-bar { border: 1px solid var(--border-subtle) !important; border-radius: var(--radius-md) !important; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.25) !important; }
+.leaflet-popup-content-wrapper {
+  background: var(--bg-glass) !important; backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--radius-md) !important; color: var(--text-primary) !important;
+  font-family: var(--sans) !important; font-size: 12px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35) !important;
+}
+.leaflet-popup-tip { background: var(--bg-glass) !important; }
+
+/* ── Weather Region Cards ──────────────────────────────────────────── */
+.weather-region-list { display: flex; flex-direction: column; gap: 6px; }
+.weather-region-card {
+  background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 10px 12px;
+  cursor: pointer; transition: all var(--transition);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.weather-region-card:hover { border-color: var(--border-hover); background: var(--accent-subtle); }
+.weather-region-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.weather-region-name {
+  font-size: 12px; font-weight: 600; color: var(--text-primary);
+}
+.weather-region-temp {
+  font-family: var(--mono); font-size: 14px; font-weight: 700;
+  color: var(--accent);
+}
+.weather-region-stats {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px;
+}
+.weather-region-stat {
+  display: flex; flex-direction: column; gap: 1px;
+}
+.weather-region-stat-label {
+  font-size: 8px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.05em; font-weight: 500;
+}
+.weather-region-stat-value {
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  color: var(--text-secondary);
+}
+.weather-region-condition {
+  font-size: 10px; color: var(--text-muted); font-style: italic;
+}
+.weather-region-loading {
+  text-align: center; padding: 20px; color: var(--text-muted);
+  font-size: 11px; font-family: var(--mono);
+}
+.weather-refresh-info {
+  font-size: 9px; color: var(--text-muted); text-align: center;
+  font-family: var(--mono); padding: 2px 0;
+}
+
+/* ── Current Arrows ───────────────────────────────────────────────── */
+.current-arrow-icon {
+  display: flex; align-items: center; justify-content: center;
+}
+.current-arrow-icon svg {
+  width: 18px; height: 18px;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+  transition: transform 0.3s ease;
+}
+
+/* ── Route Current Summary ────────────────────────────────────────── */
+.route-current {
+  background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 10px 12px;
+  margin-top: 2px;
+}
+.route-current-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.route-current-item { display: flex; flex-direction: column; gap: 1px; }
+.route-current-label { font-size: 9px; color: var(--text-muted); }
+.route-current-value { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text-primary); }
 </style>
 </head>
 <body>
+
+<!-- SVG sprite (hidden) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="icon-anchor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="21"/><path d="M5 19a7 7 0 0 1 14 0"/>
+  </symbol>
+  <symbol id="icon-route" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 17l6-6 4 4 8-8"/><polyline points="14 7 21 7 21 14"/>
+  </symbol>
+  <symbol id="icon-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+  </symbol>
+  <symbol id="icon-ship" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.5 0 2.5 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>
+    <path d="M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.94 5.34 2.81 7.76"/>
+    <path d="M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6"/><path d="M12 1v4"/>
+  </symbol>
+  <symbol id="icon-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+  </symbol>
+  <symbol id="icon-leaf" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-4.78 10-10 10Z"/>
+    <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
+  </symbol>
+  <symbol id="icon-wind" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/>
+  </symbol>
+  <symbol id="icon-waves" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.6 0 2.4-2 5-2 1.3 0 1.9.5 2.5 1"/>
+    <path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.6 0 2.4-2 5-2 1.3 0 1.9.5 2.5 1"/>
+    <path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.6 0 2.4-2 5-2 1.3 0 1.9.5 2.5 1"/>
+  </symbol>
+  <symbol id="icon-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </symbol>
+  <symbol id="icon-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+  </symbol>
+  <symbol id="icon-compass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+  </symbol>
+  <symbol id="icon-thermometer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
+  </symbol>
+  <symbol id="icon-current-arrow" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <path d="M12 2L6 14h4v8l8-12h-4L12 2z"/>
+  </symbol>
+</svg>
+
 <div class="app">
   <aside class="sidebar">
     <div class="sidebar-header">
       <div class="brand">
-        <div class="brand-icon">⚓</div>
+        <div class="brand-icon"><svg><use href="#icon-anchor"/></svg></div>
         <div>
           <div class="brand-name">ClearWake</div>
-          <div class="brand-sub">Route Optimization API</div>
+          <div class="brand-sub">Route Optimization</div>
         </div>
       </div>
     </div>
     <div class="tabs">
-      <button class="tab active" data-tab="route" onclick="switchTab(this,'route')">Route</button>
-      <button class="tab" data-tab="zones" onclick="switchTab(this,'zones')">Zones</button>
-      <button class="tab" data-tab="vessels" onclick="switchTab(this,'vessels')">Vessels</button>
+      <button class="tab active" data-tab="route" onclick="switchTab(this,'route')"><svg><use href="#icon-route"/></svg>Route</button>
+      <button class="tab" data-tab="zones" onclick="switchTab(this,'zones')"><svg><use href="#icon-layers"/></svg>Zones</button>
+      <button class="tab" data-tab="vessels" onclick="switchTab(this,'vessels')"><svg><use href="#icon-ship"/></svg>Vessels</button>
+      <button class="tab" data-tab="weather" onclick="switchTab(this,'weather')"><svg><use href="#icon-cloud"/></svg>Weather</button>
     </div>
     <div class="sidebar-content">
 
@@ -159,12 +573,12 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--ocea
           <div class="section-label">Strategy</div>
           <div class="strategy-grid">
             <div class="strategy-card active" id="strat-fastest" onclick="selectStrategy('fastest')">
-              <div class="strategy-icon">⚡</div>
+              <div class="strategy-icon"><svg><use href="#icon-bolt"/></svg></div>
               <div class="strategy-name">Fastest</div>
               <div class="strategy-desc">Min travel time</div>
             </div>
             <div class="strategy-card" id="strat-eco" onclick="selectStrategy('eco')">
-              <div class="strategy-icon">🌿</div>
+              <div class="strategy-icon"><svg><use href="#icon-leaf"/></svg></div>
               <div class="strategy-name">Eco</div>
               <div class="strategy-desc">Min fuel & CO₂</div>
             </div>
@@ -174,8 +588,8 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--ocea
         <div>
           <div class="section-label">Waypoints</div>
           <div style="display:flex;flex-direction:column;gap:8px">
-            <div class="field"><label>Origin (port/city or node ID)</label><input type="text" id="startNode" placeholder="e.g. Los Angeles or MALTA" value=""/></div>
-            <div class="field"><label>Destination (port/city or node ID)</label><input type="text" id="endNode" placeholder="e.g. Tokyo or PIRAEUS" value=""/></div>
+            <div class="field"><label>Origin</label><input type="text" id="startNode" placeholder="e.g. Los Angeles or MALTA" value=""/></div>
+            <div class="field"><label>Destination</label><input type="text" id="endNode" placeholder="e.g. Tokyo or PIRAEUS" value=""/></div>
           </div>
         </div>
         <div>
@@ -194,14 +608,88 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--ocea
             <div class="route-stat"><span class="route-stat-label">Strategy</span><span class="route-stat-val" id="res-strategy">—</span></div>
             <div class="route-stat"><span class="route-stat-label">Route ID</span><span class="route-stat-val" id="res-id" style="font-size:9px;word-break:break-all">—</span></div>
           </div>
+          <!-- Route weather summary -->
+          <div id="routeWeatherResult" style="display:none">
+            <div class="section-label">Route Weather</div>
+            <div class="route-weather">
+              <div class="route-weather-grid">
+                <div class="route-weather-item">
+                  <span class="route-weather-label">Max Waves</span>
+                  <span class="route-weather-value" id="rw-max-wave">—</span>
+                </div>
+                <div class="route-weather-item">
+                  <span class="route-weather-label">Avg Waves</span>
+                  <span class="route-weather-value" id="rw-avg-wave">—</span>
+                </div>
+                <div class="route-weather-item">
+                  <span class="route-weather-label">Max Wind</span>
+                  <span class="route-weather-value" id="rw-max-wind">—</span>
+                </div>
+                <div class="route-weather-item">
+                  <span class="route-weather-label">Sea State</span>
+                  <span class="route-weather-value" id="rw-sea-state">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Route currents summary -->
+          <div id="routeCurrentResult" style="display:none">
+            <div class="section-label">Ocean Currents</div>
+            <div class="route-current">
+              <div class="route-current-grid">
+                <div class="route-current-item">
+                  <span class="route-current-label">Avg Speed</span>
+                  <span class="route-current-value" id="rc-avg-speed">—</span>
+                </div>
+                <div class="route-current-item">
+                  <span class="route-current-label">Points Sampled</span>
+                  <span class="route-current-value" id="rc-points">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="navResult" style="display:none;flex-direction:column;gap:6px">
+            <div class="section-label">Navigation</div>
+            <div class="route-result">
+              <div class="route-stat"><span class="route-stat-label">Status</span><span class="route-stat-val" id="nav-status">Idle</span></div>
+              <div class="route-stat"><span class="route-stat-label">Position</span><span class="route-stat-val" id="nav-pos" style="font-size:9px">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Speed</span><span class="route-stat-val" id="nav-speed">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Heading</span><span class="route-stat-val" id="nav-heading">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Progress</span><span class="route-stat-val" id="nav-progress">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Next waypoint</span><span class="route-stat-val" id="nav-next">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">ETA</span><span class="route-stat-val" id="nav-eta">—</span></div>
+            </div>
+          </div>
+          <div id="rerouteResult" style="display:none;flex-direction:column;gap:6px">
+            <div class="section-label">AI Reroute</div>
+            <div class="route-result">
+              <div class="route-stat"><span class="route-stat-label">Status</span><span class="route-stat-val" id="rr-status">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Δ Distance</span><span class="route-stat-val" id="rr-dist">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Δ Duration</span><span class="route-stat-val" id="rr-dur">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Δ Fuel</span><span class="route-stat-val" id="rr-fuel">—</span></div>
+              <div class="route-stat" style="margin-top:4px"><span class="route-stat-label" style="font-size:10px" id="rr-reco">—</span></div>
+              <div style="display:flex;gap:6px;margin-top:6px">
+                <button class="btn btn-primary btn-sm" style="flex:1" onclick="applyAiReroute()" id="applyRerouteBtn" disabled>Apply alternative</button>
+                <button class="btn btn-ghost btn-sm" style="flex:1" onclick="dismissAiReroute()">Dismiss</button>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-primary btn-sm" style="flex:1" onclick="startNavigation()" id="startNavBtn">Start</button>
+            <button class="btn btn-ghost btn-sm" style="flex:1;display:none" onclick="stopNavigation()" id="stopNavBtn">Stop</button>
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="requestAiReroute()" id="aiRerouteBtn">AI reroute</button>
+          </div>
           <button class="btn btn-ghost btn-sm" onclick="clearRoute()">Clear route</button>
         </div>
         <div class="divider"></div>
         <div>
           <div class="section-label">Map display</div>
-          <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;flex-direction:column;gap:8px">
             <div class="toggle-row"><span>Show zones</span><label class="toggle"><input type="checkbox" id="toggleZones" checked onchange="toggleZonesLayer(this.checked)"/><span class="toggle-slider"></span></label></div>
             <div class="toggle-row"><span>Show vessels</span><label class="toggle"><input type="checkbox" id="toggleVessels" onchange="toggleVesselsLayer(this.checked)"/><span class="toggle-slider"></span></label></div>
+            <div class="toggle-row"><span>Rain radar</span><label class="toggle"><input type="checkbox" id="toggleRadar" onchange="toggleRadarLayer(this.checked)"/><span class="toggle-slider"></span></label></div>
+            <div class="toggle-row"><span>Click weather</span><label class="toggle"><input type="checkbox" id="toggleWeather" checked onchange="toggleWeatherClick(this.checked)"/><span class="toggle-slider"></span></label></div>
+            <div class="toggle-row"><span>Show currents</span><label class="toggle"><input type="checkbox" id="toggleCurrents" onchange="toggleCurrentsLayer(this.checked)"/><span class="toggle-slider"></span></label></div>
           </div>
         </div>
       </div>
@@ -213,15 +701,15 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--ocea
           <div class="section-label">New zone</div>
           <div class="field"><label>Name</label><input type="text" id="zoneName" placeholder="e.g. Great Barrier Reef"/></div>
           <div class="field"><label>Type</label><select id="zoneType"><option value="eco">Eco</option><option value="conflict">Conflict</option><option value="canal">Canal</option><option value="temporary">Temporary</option></select></div>
-            <div class="hint">Draw a polygon on the map (recommended), or paste GeoJSON manually.</div>
-            <div style="display:flex;gap:8px">
+            <div class="hint">Draw a polygon on the map, or paste GeoJSON.</div>
+            <div style="display:flex;gap:6px">
               <button class="btn btn-ghost btn-sm" style="flex:1" onclick="startZoneDrawing()">Draw on map</button>
               <button class="btn btn-ghost btn-sm" style="flex:1" onclick="useViewportZone()">Use view</button>
-              <button class="btn btn-ghost btn-sm" style="flex:1" onclick="clearDrawnZone()">Clear shape</button>
+              <button class="btn btn-ghost btn-sm" style="flex:1" onclick="clearDrawnZone()">Clear</button>
             </div>
             <div class="hint" id="drawStatus">No shape drawn yet.</div>
           <div class="field"><label>GeoJSON geometry</label><input type="text" id="zoneGeometry" placeholder='{"type":"Polygon","coordinates":[...]}' style="font-size:10px"/></div>
-          <div style="display:flex;gap:8px">
+          <div style="display:flex;gap:6px">
             <button class="btn btn-primary btn-sm" style="flex:1" onclick="submitZone()">Save</button>
             <button class="btn btn-ghost btn-sm" style="flex:1" onclick="hideAddZoneForm()">Cancel</button>
           </div>
@@ -238,12 +726,23 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--ocea
         <div>
           <div class="section-label">Fleet <span id="vesselCount" style="color:var(--accent)"></span></div>
           <div class="field">
-            <label>Filter by vessel type</label>
+            <label>Filter by type</label>
             <select id="vesselTypeFilter" onchange="setVesselTypeFilter(this.value)">
               <option value="">All vessel types</option>
             </select>
           </div>
           <div class="zone-list" id="vesselList"><div class="empty">Loading vessels...</div></div>
+        </div>
+      </div>
+
+      <!-- WEATHER PANEL -->
+      <div class="panel" id="panel-weather">
+        <div>
+          <div class="section-label">Regional Weather</div>
+          <div class="weather-refresh-info" id="weatherRefreshInfo">Loading weather data...</div>
+        </div>
+        <div class="weather-region-list" id="weatherRegionList">
+          <div class="weather-region-loading"><span class="spinner"></span> Fetching weather for all regions...</div>
         </div>
       </div>
 
@@ -253,6 +752,28 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--ocea
   <div class="map-wrap">
     <div id="map"></div>
     <div class="map-status" id="mapStatus">Initializing...</div>
+
+    <!-- Weather Widget -->
+    <div class="weather-widget" id="weatherWidget">
+      <div class="weather-widget-header">
+        <span class="weather-widget-title">Marine Weather</span>
+        <button class="weather-widget-close" onclick="hideWeatherWidget()"><svg><use href="#icon-x"/></svg></button>
+      </div>
+      <div id="weatherWidgetBody">
+        <div class="weather-loading"><span class="spinner"></span> Loading...</div>
+      </div>
+    </div>
+
+    <!-- Rain Radar Legend -->
+    <div class="radar-legend" id="radarLegend">
+      <div class="radar-legend-title">Precipitation Radar</div>
+      <div class="radar-legend-bar"></div>
+      <div class="radar-legend-labels">
+        <span>Light</span><span>Moderate</span><span>Heavy</span>
+      </div>
+      <div class="radar-legend-time" id="radarTime"></div>
+    </div>
+
     <div class="loading-overlay" id="loadingOverlay">
       <div class="loading-box">
         <div class="spinner"></div>
@@ -280,6 +801,18 @@ let pendingZoneGeometry = null;
 let currentRouteRequest = null;
 let routeRefreshTimer = null;
 let landGeometries = [];
+let weatherClickEnabled = true;
+let radarLayer = null;
+let radarVisible = false;
+let radarRefreshTimer = null;
+let regionWeatherData = [];
+let regionWeatherTimer = null;
+let currentsLayer = null;
+let currentsVisible = false;
+let weatherMarkersLayer = null;
+let currentRouteData = null;        // last computed route (with waypoints + _id + vessel_id)
+let navigationState = null;         // active GPS-tracking session
+let aiRerouteSuggestion = null;     // last AI reroute suggestion
 
 function notify(msg, type = 'ok') {
   const n = document.getElementById('notif');
@@ -327,7 +860,7 @@ function selectStrategy(s) {
 }
 
 const zoneColors = {
-  eco: '#22c55e', conflict: '#f43f5e', canal: '#f59e0b', temporary: '#38bdf8'
+  eco: '#4ade80', conflict: '#fb7185', canal: '#fbbf24', temporary: '#60a5fa'
 };
 
 const LAND_GEOJSON_SOURCES = [
@@ -397,7 +930,7 @@ function landMaskStyleFor(layerName) {
 function lakeMaskStyleFor(layerName) {
   if (layerName === 'Dark Ocean') {
     return {
-      fillColor: '#07111f',
+      fillColor: '#0b1120',
       fillOpacity: 0.95,
       stroke: false,
     };
@@ -418,13 +951,382 @@ function applyMaskStyle(layerName) {
   }
 }
 
+/* ── Weather Functions ────────────────────────────────────────────── */
+
+function toggleWeatherClick(enabled) {
+  weatherClickEnabled = enabled;
+  if (!enabled) hideWeatherWidget();
+}
+
+function toggleCurrentsLayer(enabled) {
+  currentsVisible = enabled;
+  if (!enabled && currentsLayer && map.hasLayer(currentsLayer)) {
+    map.removeLayer(currentsLayer);
+  }
+}
+
+/* ── Regional Weather Loading ───────────────────────────────────── */
+
+async function loadRegionalWeather() {
+  try {
+    const resp = await fetch('/api/v1/weather/regions');
+    if (!resp.ok) throw new Error('Failed to load regional weather');
+    regionWeatherData = await resp.json();
+    renderWeatherRegionCards();
+    renderWeatherMarkers();
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const infoEl = document.getElementById('weatherRefreshInfo');
+    if (infoEl) infoEl.textContent = `Updated: ${now} · Auto-refresh 10min`;
+  } catch (err) {
+    console.warn('Regional weather load failed:', err);
+    const el = document.getElementById('weatherRegionList');
+    if (el) el.innerHTML = '<div class="weather-region-loading" style="color:var(--danger)">Could not load weather data</div>';
+  }
+}
+
+function renderWeatherRegionCards() {
+  const el = document.getElementById('weatherRegionList');
+  if (!el || !regionWeatherData.length) return;
+
+  el.innerHTML = regionWeatherData.map(r => {
+    const temp = r.temperature_2m != null ? `${r.temperature_2m}°C` : '—';
+    const wind = r.wind_speed_10m != null ? `${r.wind_speed_10m} km/h` : '—';
+    const waves = r.wave_height != null ? `${r.wave_height}m` : '—';
+    const seaState = r.sea_state?.label || '—';
+    const beaufort = r.beaufort?.label || '—';
+    const condition = r.weather_label || '—';
+    const lat = r.lat || 0;
+    const lon = r.lon || 0;
+
+    return `
+      <div class="weather-region-card" onclick="flyToRegion(${lat}, ${lon}, '${r.region_name || ''}')">
+        <div class="weather-region-card-header">
+          <span class="weather-region-name">${r.region_name || 'Unknown'}</span>
+          <span class="weather-region-temp">${temp}</span>
+        </div>
+        <div class="weather-region-stats">
+          <div class="weather-region-stat">
+            <span class="weather-region-stat-label">Wind</span>
+            <span class="weather-region-stat-value">${wind}</span>
+          </div>
+          <div class="weather-region-stat">
+            <span class="weather-region-stat-label">Waves</span>
+            <span class="weather-region-stat-value">${waves}</span>
+          </div>
+          <div class="weather-region-stat">
+            <span class="weather-region-stat-label">Sea</span>
+            <span class="weather-region-stat-value" style="font-size:9px">${seaState}</span>
+          </div>
+        </div>
+        <div class="weather-region-condition">${condition} · ${beaufort}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function flyToRegion(lat, lon, name) {
+  if (map) {
+    map.flyTo([lat, lon], 5, { duration: 1.2 });
+    fetchWeatherForPoint(lat, lon);
+  }
+}
+
+function renderWeatherMarkers() {
+  if (!map) return;
+  if (weatherMarkersLayer) {
+    map.removeLayer(weatherMarkersLayer);
+  }
+  weatherMarkersLayer = L.featureGroup();
+
+  regionWeatherData.forEach(r => {
+    if (!r.lat || !r.lon) return;
+    const temp = r.temperature_2m != null ? `${r.temperature_2m}°` : '?';
+    const icon = L.divIcon({
+      className: 'weather-marker-icon',
+      html: `<div style="
+        background:var(--bg-glass);backdrop-filter:blur(8px);
+        border:1px solid var(--border-default);border-radius:6px;
+        padding:2px 5px;font-family:var(--mono);font-size:10px;
+        color:var(--accent);font-weight:600;white-space:nowrap;
+        box-shadow:0 2px 8px rgba(0,0,0,0.3);
+      ">${temp}</div>`,
+      iconSize: [40, 20],
+      iconAnchor: [20, 10],
+    });
+
+    L.marker([r.lat, r.lon], { icon, interactive: true })
+      .bindPopup(`<b>${r.region_name || 'Region'}</b><br>Temp: ${temp}<br>Wind: ${r.wind_speed_10m || '—'} km/h<br>Waves: ${r.wave_height || '—'}m`)
+      .addTo(weatherMarkersLayer);
+  });
+
+  weatherMarkersLayer.addTo(map);
+}
+
+/* ── Route Currents ──────────────────────────────────────────── */
+
+async function fetchRouteCurrents(waypoints) {
+  if (!waypoints || waypoints.length < 2) return;
+
+  // Sample up to 10 points
+  const step = Math.max(1, Math.floor(waypoints.length / 10));
+  const sampled = [];
+  for (let i = 0; i < waypoints.length && sampled.length < 10; i += step) {
+    const wp = waypoints[i];
+    if (wp.coordinates && wp.coordinates.length >= 2) {
+      sampled.push(`${wp.coordinates[1].toFixed(4)},${wp.coordinates[0].toFixed(4)}`);
+    }
+  }
+
+  if (!sampled.length) return;
+
+  try {
+    const resp = await fetch(`/api/v1/weather/currents/route?points=${sampled.join(';')}`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+
+    // Update UI
+    const el = document.getElementById('routeCurrentResult');
+    if (!el) return;
+    const s = data.summary || {};
+    document.getElementById('rc-avg-speed').textContent = s.avg_current_speed_knots != null ? `${s.avg_current_speed_knots} kn` : '—';
+    document.getElementById('rc-points').textContent = s.point_count != null ? s.point_count : '—';
+    el.style.display = 'block';
+
+    // Draw current arrows on map
+    if (currentsVisible && data.points && data.points.length) {
+      renderCurrentArrows(data.points);
+    }
+  } catch (e) {
+    console.warn('Route currents fetch failed:', e);
+  }
+}
+
+function renderCurrentArrows(points) {
+  if (currentsLayer && map.hasLayer(currentsLayer)) {
+    map.removeLayer(currentsLayer);
+  }
+  currentsLayer = L.featureGroup();
+
+  points.forEach(pt => {
+    if (!pt.lat || !pt.lon) return;
+    const speedKn = pt.speed_knots || 0;
+    const dir = pt.direction_deg || 0;
+
+    // Color based on speed: blue (slow) -> cyan -> yellow (fast)
+    let color = '#60a5fa';
+    if (speedKn > 0.5) color = '#22d3ee';
+    if (speedKn > 1.0) color = '#fbbf24';
+    if (speedKn > 1.5) color = '#fb923c';
+
+    const icon = L.divIcon({
+      className: 'current-arrow-icon',
+      html: `<svg viewBox="0 0 24 24" style="transform:rotate(${dir}deg);color:${color}"><use href="#icon-current-arrow"/></svg>`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
+    });
+
+    L.marker([pt.lat, pt.lon], { icon, interactive: true })
+      .bindPopup(`<b>Current</b><br>Speed: ${speedKn.toFixed(2)} kn<br>Direction: ${dir.toFixed(0)}°`)
+      .addTo(currentsLayer);
+  });
+
+  currentsLayer.addTo(map);
+}
+
+/* ── Rain Radar (RainViewer — free, no API key) ───────────────────── */
+
+async function loadRainViewerRadar() {
+  try {
+    const resp = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+    if (!resp.ok) throw new Error('RainViewer API error');
+    const data = await resp.json();
+
+    const radarFrames = data.radar?.past || [];
+    const nowcastFrames = data.radar?.nowcast || [];
+    const allFrames = [...radarFrames, ...nowcastFrames];
+    if (!allFrames.length) throw new Error('No radar frames available');
+
+    // Use the most recent frame
+    const latest = allFrames[allFrames.length - 1];
+    const tileUrl = data.host + latest.path + '/256/{z}/{x}/{y}/4/1_1.png';
+
+    // Remove old layer if exists
+    if (radarLayer && map.hasLayer(radarLayer)) {
+      map.removeLayer(radarLayer);
+    }
+
+    radarLayer = L.tileLayer(tileUrl, {
+      opacity: 0.65,
+      zIndex: 500,
+      // RainViewer only serves real radar data up to z=7; at z≥8 it
+      // returns a 1370-byte "Zoom Level Not Supported" placeholder PNG
+      // for every empty region — that's what filled the map with grey
+      // boxes. Cap at 7 and let Leaflet upscale.
+      maxNativeZoom: 7,
+      minNativeZoom: 0,
+      maxZoom: 18,
+      noWrap: true,
+      bounds: [[-85, -180], [85, 180]],
+      attribution: '<a href="https://www.rainviewer.com/" target="_blank">RainViewer</a>',
+    });
+
+    if (radarVisible) {
+      radarLayer.addTo(map);
+    }
+
+    // Update legend timestamp
+    const time = new Date(latest.time * 1000);
+    const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const el = document.getElementById('radarTime');
+    if (el) el.textContent = `Updated: ${timeStr}`;
+
+    return true;
+  } catch (err) {
+    console.warn('RainViewer load failed:', err);
+    return false;
+  }
+}
+
+function toggleRadarLayer(enabled) {
+  radarVisible = enabled;
+  document.getElementById('radarLegend').classList.toggle('show', enabled);
+
+  if (enabled) {
+    // Always re-fetch on toggle-on — reusing a layer whose RainViewer
+    // frame timestamp expired upstream is what produced the persistent
+    // "Zoom Level Not Supported" grey tiles on the screenshots.
+    loadRainViewerRadar();
+    if (!radarRefreshTimer) {
+      // RainViewer rolls frames every ~10 min and retires URLs after
+      // ~2 h. Refresh every 4 min so we never display a stale URL.
+      radarRefreshTimer = setInterval(() => {
+        if (radarVisible) loadRainViewerRadar();
+      }, 4 * 60 * 1000);
+    }
+  } else {
+    if (radarLayer && map.hasLayer(radarLayer)) {
+      map.removeLayer(radarLayer);
+    }
+    if (radarRefreshTimer) {
+      clearInterval(radarRefreshTimer);
+      radarRefreshTimer = null;
+    }
+  }
+}
+
+function hideWeatherWidget() {
+  document.getElementById('weatherWidget').classList.remove('show');
+}
+
+async function fetchWeatherForPoint(lat, lon) {
+  const widget = document.getElementById('weatherWidget');
+  const body = document.getElementById('weatherWidgetBody');
+
+  widget.classList.add('show');
+  body.innerHTML = '<div class="weather-loading"><span class="spinner"></span> Loading…</div>';
+
+  try {
+    const resp = await fetch(`/api/v1/weather/marine?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`);
+    if (!resp.ok) throw new Error('Weather unavailable');
+    const data = await resp.json();
+
+    const waveH = data.wave_height != null ? `${data.wave_height}m` : '—';
+    const windS = data.wind_speed_10m != null ? `${data.wind_speed_10m} km/h` : '—';
+    const windD = data.wind_direction_10m != null ? `${data.wind_direction_10m}°` : '—';
+    const temp = data.temperature_2m != null ? `${data.temperature_2m}°C` : '—';
+    const seaState = data.sea_state?.label || '—';
+    const beaufort = data.beaufort?.label || '—';
+    const condition = data.weather_label || '—';
+    const swellH = data.swell_wave_height != null ? `${data.swell_wave_height}m` : '—';
+
+    body.innerHTML = `
+      <div class="weather-grid">
+        <div class="weather-stat">
+          <span class="weather-stat-label">Waves</span>
+          <span class="weather-stat-value">${waveH}</span>
+        </div>
+        <div class="weather-stat">
+          <span class="weather-stat-label">Wind</span>
+          <span class="weather-stat-value">${windS}</span>
+        </div>
+        <div class="weather-stat">
+          <span class="weather-stat-label">Swell</span>
+          <span class="weather-stat-value">${swellH}</span>
+        </div>
+        <div class="weather-stat">
+          <span class="weather-stat-label">Temp</span>
+          <span class="weather-stat-value">${temp}</span>
+        </div>
+        <div class="weather-stat">
+          <span class="weather-stat-label">Sea State</span>
+          <span class="weather-stat-value" style="font-size:10px">${seaState}</span>
+        </div>
+        <div class="weather-stat">
+          <span class="weather-stat-label">Beaufort</span>
+          <span class="weather-stat-value" style="font-size:10px">${beaufort}</span>
+        </div>
+      </div>
+      <div class="weather-condition">
+        <svg><use href="#icon-cloud"/></svg>
+        <span>${condition} · Wind ${windD}</span>
+      </div>
+    `;
+  } catch (e) {
+    body.innerHTML = `<div class="weather-loading" style="color:var(--danger)">${e.message || 'Failed to load weather'}</div>`;
+  }
+}
+
+async function fetchRouteWeather(waypoints) {
+  if (!waypoints || waypoints.length < 2) return;
+
+  // Sample up to 10 points
+  const step = Math.max(1, Math.floor(waypoints.length / 10));
+  const sampled = [];
+  for (let i = 0; i < waypoints.length && sampled.length < 10; i += step) {
+    const wp = waypoints[i];
+    if (wp.coordinates && wp.coordinates.length >= 2) {
+      sampled.push(`${wp.coordinates[1].toFixed(4)},${wp.coordinates[0].toFixed(4)}`);
+    }
+  }
+
+  if (!sampled.length) return;
+
+  try {
+    const resp = await fetch(`/api/v1/weather/route?points=${sampled.join(';')}`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+
+    const el = document.getElementById('routeWeatherResult');
+    if (!el) return;
+
+    const s = data.summary || {};
+    document.getElementById('rw-max-wave').textContent = s.max_wave_height != null ? `${s.max_wave_height}m` : '—';
+    document.getElementById('rw-avg-wave').textContent = s.avg_wave_height != null ? `${s.avg_wave_height}m` : '—';
+    document.getElementById('rw-max-wind').textContent = s.max_wind_speed != null ? `${s.max_wind_speed} km/h` : '—';
+    document.getElementById('rw-sea-state').textContent = s.worst_sea_state?.label || '—';
+    el.style.display = 'block';
+  } catch (e) {
+    console.warn('Route weather fetch failed:', e);
+  }
+}
+
+/* ── Map Init ─────────────────────────────────────────────────────── */
+
 async function initMap() {
   map = L.map('map', {
     center: [20, 30], zoom: 3, minZoom: 2, maxZoom: 18,
-    worldCopyJump: true,
-    zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 80,
+    // worldCopyJump + wrapped tile layers were causing duplicate-tile
+    // artifacts (the "parallel lines" the user saw) at certain zooms.
+    // Lock to a single world copy.
+    worldCopyJump: false,
+    maxBounds: [[-85, -180], [85, 180]],
+    maxBoundsViscosity: 1.0,
+    zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 120,
     preferCanvas: true,
   });
+
+  // Single shared canvas renderer — avoids creating one per layer (huge perf win)
+  const sharedCanvas = L.canvas({ padding: 0.5, tolerance: 5 });
 
   ['landPane','lakePane','zonePane','routePane','vesselPane','labelPane'].forEach((p,i) => {
     map.createPane(p);
@@ -433,25 +1335,18 @@ async function initMap() {
     if (p === 'labelPane') map.getPane(p).style.pointerEvents = 'none';
   });
 
-  const darkOcean = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, attribution:'&copy; OpenStreetMap &copy; CARTO' });
-  const voyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, attribution:'&copy; OpenStreetMap &copy; CARTO' });
-  const positron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, attribution:'&copy; OpenStreetMap &copy; CARTO' });
-  const openStreetMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'&copy; OpenStreetMap contributors' });
+  // Two basemaps: one dark, one light. Both have CARTO label overlays
+  // that match their style, so POI/country names stay legible.
+  const darkOcean = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, noWrap:true, bounds:[[-85,-180],[85,180]], attribution:'&copy; OpenStreetMap &copy; CARTO' });
+  const voyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:20, noWrap:true, bounds:[[-85,-180],[85,180]], attribution:'&copy; OpenStreetMap &copy; CARTO' });
 
   const baseLayers = {
     'Dark Ocean': darkOcean,
     'CARTO Voyager': voyager,
-    'CARTO Positron': positron,
-    'OpenStreetMap': openStreetMap,
   };
 
   const provider = String(MAP_PROVIDER || '').toLowerCase();
-  const preferredBaseLayerName = (
-    provider === 'carto-dark' ? 'Dark Ocean' :
-    provider === 'carto-positron' ? 'CARTO Positron' :
-    provider === 'osm' ? 'OpenStreetMap' :
-    'CARTO Voyager'
-  );
+  const preferredBaseLayerName = provider === 'carto-dark' ? 'Dark Ocean' : 'CARTO Voyager';
 
   const preferredLayer = baseLayers[preferredBaseLayerName] || voyager;
   preferredLayer.addTo(map);
@@ -462,18 +1357,9 @@ async function initMap() {
       map.removeLayer(labelsLayer);
     }
 
-    const labelsUrl = (
-      layerName === 'Dark Ocean'
-        ? 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png'
-        : (layerName === 'CARTO Voyager' || layerName === 'CARTO Positron')
-          ? 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png'
-          : null
-    );
-
-    if (!labelsUrl) {
-      labelsLayer = null;
-      return;
-    }
+    const labelsUrl = layerName === 'Dark Ocean'
+      ? 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png';
 
     labelsLayer = L.tileLayer(labelsUrl, {
       subdomains: 'abcd',
@@ -505,8 +1391,8 @@ async function initMap() {
       pane:'landPane',
       style: landMaskStyleFor(preferredBaseLayerName),
       interactive:false,
-      smoothFactor: 2.0,
-      renderer: L.canvas({ padding: 0.3 }),
+      smoothFactor: 5.0,
+      renderer: sharedCanvas,
     }).addTo(map);
   }
   if (!landGeometries.length) {
@@ -517,8 +1403,8 @@ async function initMap() {
       pane:'lakePane',
       style: lakeMaskStyleFor(preferredBaseLayerName),
       interactive:false,
-      smoothFactor: 2.0,
-      renderer: L.canvas({ padding: 0.3 }),
+      smoothFactor: 5.0,
+      renderer: sharedCanvas,
     }).addTo(map);
   }
   applyMaskStyle(preferredBaseLayerName);
@@ -544,10 +1430,10 @@ async function initMap() {
         allowIntersection: false,
         showArea: true,
         shapeOptions: {
-          color: '#38bdf8',
+          color: '#60a5fa',
           weight: 2,
-          fillColor: '#38bdf8',
-          fillOpacity: 0.18,
+          fillColor: '#60a5fa',
+          fillOpacity: 0.15,
         },
       },
     },
@@ -568,17 +1454,51 @@ async function initMap() {
     notify('Zone shape captured');
   });
 
+  // Weather on map click
+  map.on('click', (e) => {
+    if (!weatherClickEnabled) return;
+    // Don't trigger weather if we're in draw mode
+    if (drawnZoneLayer && drawnZoneLayer.getLayers().length > 0) return;
+    fetchWeatherForPoint(e.latlng.lat, e.latlng.lng);
+  });
+
   map.on('zoom', () => setStatus(`Zoom: ${map.getZoom().toFixed(1)}`));
-  let _moveEndRaf = null;
+  // Debounce zone re-rendering to avoid lag during pan/zoom
+  let _moveEndTimer = null;
   map.on('moveend', () => {
-    if (_moveEndRaf) cancelAnimationFrame(_moveEndRaf);
-    _moveEndRaf = requestAnimationFrame(() => {
+    if (_moveEndTimer) clearTimeout(_moveEndTimer);
+    _moveEndTimer = setTimeout(() => {
       if (zonesVisible) renderZonesOnMap();
-    });
+    }, 300);
   });
   setStatus('Ready');
   await loadVesselTypes();
   await Promise.all([loadZones(), loadVessels(), loadPortCatalogue()]);
+
+  // Load regional weather
+  loadRegionalWeather();
+  regionWeatherTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      loadRegionalWeather();
+    }
+  }, 10 * 60 * 1000);
+
+  // Auto-load radar so weather is visible immediately
+  loadRainViewerRadar().then(ok => {
+    if (ok) {
+      radarVisible = true;
+      if (radarLayer) radarLayer.addTo(map);
+      document.getElementById('radarLegend').classList.add('show');
+      document.getElementById('toggleRadar').checked = true;
+      // Auto-refresh every 5 min — guarded so we don't double-install
+      // the timer (the toggle handler installs one too).
+      if (!radarRefreshTimer) {
+        radarRefreshTimer = setInterval(() => {
+          if (radarVisible) loadRainViewerRadar();
+        }, 5 * 60 * 1000);
+      }
+    }
+  });
 }
 
 async function loadZones() {
@@ -628,7 +1548,7 @@ function renderZoneList() {
         ${z.status === 'inactive'
           ? `<button class="btn btn-ghost btn-sm" onclick="activateZone('${id}')">On</button>`
           : `<button class="btn btn-ghost btn-sm" onclick="deactivateZone('${id}')">Off</button>`}
-        <button class="btn btn-danger btn-sm" onclick="deleteZone('${id}')">✕</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteZone('${id}')"><svg style="width:10px;height:10px"><use href="#icon-x"/></svg></button>
       </div>
     </div>`;
   }).join('');
@@ -641,7 +1561,7 @@ function renderZonesOnMap() {
 
   zonesData.forEach(z => {
     if (!z.geometry) return;
-    const c = zoneColors[z.zone_type] || '#38bdf8';
+    const c = zoneColors[z.zone_type] || '#60a5fa';
     const active = z.status !== 'inactive';
 
     const firstLon = extractFirstLon(z.geometry);
@@ -653,7 +1573,7 @@ function renderZonesOnMap() {
 
     L.geoJSON(shifted, {
       pane: 'zonePane',
-      style: { color:c, weight: active?2:1, fillColor:c, fillOpacity: active?0.18:0.05, dashArray: active?null:'6 4', opacity: active?0.9:0.4 }
+      style: { color:c, weight: active?1.5:1, fillColor:c, fillOpacity: active?0.12:0.04, dashArray: active?null:'6 4', opacity: active?0.8:0.3 }
     }).bindPopup(`<b>${z.name||'Zone'}</b><br>Type: ${z.zone_type}<br>Status: ${z.status||'active'}`).addTo(zonesLayer);
   });
 }
@@ -720,10 +1640,10 @@ function useViewportZone() {
   if (drawnZoneLayer) {
     drawnZoneLayer.clearLayers();
     drawnZoneLayer.addLayer(L.polygon(polygon.coordinates, {
-      color: '#38bdf8',
+      color: '#60a5fa',
       weight: 2,
-      fillColor: '#38bdf8',
-      fillOpacity: 0.18,
+      fillColor: '#60a5fa',
+      fillOpacity: 0.15,
     }));
   }
 
@@ -952,7 +1872,7 @@ function renderVesselList() {
           <span class="badge badge-canal">${getVesselTypeLabel(v.vessel_type)}</span>
           <span class="badge ${v.current_status==='en_route'?'badge-active':'badge-inactive'}">${v.current_status||'idle'}</span>
         </div>
-        <div style="font-size:10px;color:var(--muted);margin-top:4px;font-family:var(--mono)">${v.imo_number||''}</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px;font-family:var(--mono)">${v.imo_number||''}</div>
       </div>
       <div class="zone-item-actions">
         <button class="btn btn-ghost btn-sm" onclick="chooseVesselForRoute('${vesselId}')">Use</button>
@@ -967,7 +1887,7 @@ function renderVesselsOnMap() {
     const pos = v.current_position || v.current_location;
     if (!pos?.coordinates) return;
     L.circleMarker([pos.coordinates[1], pos.coordinates[0]], {
-      pane:'vesselPane', radius:6, fillColor:'#38bdf8', color:'#fff', weight:2, fillOpacity:1
+      pane:'vesselPane', radius:5, fillColor:'#60a5fa', color:'#fff', weight:1.5, fillOpacity:1
     }).bindPopup(`<b>${v.name}</b><br>${getVesselTypeLabel(v.vessel_type)}<br>${v.current_status}`).addTo(vesselsLayer);
   });
 }
@@ -1313,8 +2233,6 @@ function segmentIntersectsLand(start, end) {
       }
 
       // Short coastal legs: if it intersects land at all, treat as blocked.
-      // The sample-based check below can miss narrow coastal crossings
-      // (e.g. Varna→Burgas clipping the Bulgarian coast).
       if (lineLengthKm < 300) {
         return true;
       }
@@ -1925,27 +2843,18 @@ function splitRouteSegments(coords) {
 
 /**
  * Recursively subdivides a leg that crosses land until every sub-segment
- * stays over water. At each level, the midpoint of the blocked segment is
- * computed on the great circle and, if it falls on land, pushed to the
- * nearest water point (perpendicular to the leg direction first, then
- * radial search). The two resulting sub-legs are then checked recursively.
- *
- * Max depth of 8 gives up to 256 sub-segments — fine-grained enough to
- * trace any coastline.
+ * stays over water.
  */
 function subdivideAroundLand(a, b, depth) {
-  // Short legs need fewer subdivisions (smoother curve, fewer points)
   const legKm = haversineKm(a, b);
   const MAX_DEPTH = legKm < 200 ? 4 : legKm < 500 ? 6 : 8;
   if (depth >= MAX_DEPTH) return [a, b];
   if (!segmentIntersectsLand(a, b)) return [a, b];
 
-  // Find the midpoint on the great circle
   const mid = interpolateGreatCircle(a, b, 0.5);
   let waterMid = { lat: mid.lat, lon: normalizeLon(mid.lon) };
 
   if (pointIsOnLand(waterMid)) {
-    // Push perpendicular to the leg direction first (faster than radial)
     const legBearing = bearingBetween(a, b);
     const perpR = (legBearing + 90) % 360;
     const perpL = (legBearing + 270) % 360;
@@ -1958,7 +2867,6 @@ function subdivideAroundLand(a, b, depth) {
       if (!pointIsOnLand(cL)) { waterMid = cL; found = true; break; }
     }
 
-    // Fallback: full radial search biased toward destination
     if (!found) {
       waterMid = findNearestWaterPoint(mid, b);
     }
@@ -1970,16 +2878,8 @@ function subdivideAroundLand(a, b, depth) {
 }
 
 /**
- * Takes a graph-based route (sequence of port/waypoint coordinates from the
- * backend) and re-routes each leg through the frontend's water-avoidance
- * system so the final rendered path stays 100 % over water.
- *
- * Strategy:
- *   1. Try the full zone-aware detour system (handles zones + land).
- *   2. If that throws, fall back to recursive subdivision which handles
- *      any size of land mass reliably.
- *   3. As a final safety net, run subdivision over every sub-leg produced
- *      by step 1/2 to catch any remaining land crossings.
+ * Takes a graph-based route and re-routes each leg through the frontend's
+ * water-avoidance system so the final rendered path stays 100% over water.
  */
 async function ensureRouteOverWater(route, vesselId) {
   const hasLandMask = await ensureLandGeometriesLoaded();
@@ -2117,6 +3017,12 @@ async function calculateRoute() {
 
     displayRoute(route);
     notify(`Route calculated — ${route.waypoints?.length||0} points ✓`);
+
+    // Fetch route weather in background
+    fetchRouteWeather(route.waypoints);
+
+    // Fetch route currents in background
+    fetchRouteCurrents(route.waypoints);
   } catch(e) {
     notify(e.message||'Calculation failed','err');
   } finally {
@@ -2154,6 +3060,9 @@ function displayRoute(route) {
   routeLayer.clearLayers();
   const wps = (route.waypoints||[]).sort((a,b)=>a.sequence-b.sequence);
   if (!wps.length) return;
+  currentRouteData = { ...route, waypoints: wps };
+  stopNavigation(true);
+  dismissAiReroute(true);
   const coords = wps.map(w => [w.coordinates[1], w.coordinates[0]]);
   const segments = splitRouteSegments(coords);
   const allCoords = [];
@@ -2162,21 +3071,21 @@ function displayRoute(route) {
     allCoords.push(...segment);
     L.polyline(segment, {
       pane:'routePane',
-      color:'#38bdf8',
-      weight:3.5,
-      opacity:0.95,
+      color:'#60a5fa',
+      weight:3,
+      opacity:0.9,
       lineJoin:'round',
       lineCap:'round'
     }).addTo(routeLayer);
   });
 
-  L.circleMarker(coords[0],{pane:'routePane',radius:8,fillColor:'#22c55e',color:'#fff',weight:2,fillOpacity:1}).bindPopup(`<b>Origin</b>`).addTo(routeLayer);
-  L.circleMarker(coords[coords.length-1],{pane:'routePane',radius:8,fillColor:'#f43f5e',color:'#fff',weight:2,fillOpacity:1}).bindPopup(`<b>Destination</b>`).addTo(routeLayer);
-  // Only draw markers for named port waypoints, not every interpolation point
+  L.circleMarker(coords[0],{pane:'routePane',radius:7,fillColor:'#4ade80',color:'#fff',weight:2,fillOpacity:1}).bindPopup(`<b>Origin</b>`).addTo(routeLayer);
+  L.circleMarker(coords[coords.length-1],{pane:'routePane',radius:7,fillColor:'#fb7185',color:'#fff',weight:2,fillOpacity:1}).bindPopup(`<b>Destination</b>`).addTo(routeLayer);
+  // Only draw markers for named port waypoints
   wps.slice(1,-1).forEach((w, idx) => {
     if (w.point_type === 'port' && w.name) {
       const c = [w.coordinates[1], w.coordinates[0]];
-      L.circleMarker(c,{pane:'routePane',radius:4,fillColor:'#38bdf8',color:'#07111f',weight:1.5,fillOpacity:0.8})
+      L.circleMarker(c,{pane:'routePane',radius:3.5,fillColor:'#60a5fa',color:'var(--bg-primary)',weight:1.5,fillOpacity:0.8})
         .bindPopup(`<b>${w.name}</b>`)
         .addTo(routeLayer);
     }
@@ -2212,12 +3121,347 @@ function displayRoute(route) {
   document.getElementById('res-id').textContent = route._id?.$oid||route._id||'—';
 }
 
-function clearRoute() { routeLayer.clearLayers(); document.getElementById('routeResult').style.display='none'; }
+function clearRoute() {
+  stopNavigation(true);
+  dismissAiReroute(true);
+  routeLayer.clearLayers();
+  currentRouteData = null;
+  document.getElementById('routeResult').style.display='none';
+  document.getElementById('routeWeatherResult').style.display='none';
+  document.getElementById('routeCurrentResult').style.display='none';
+  if (currentsLayer && map.hasLayer(currentsLayer)) {
+    map.removeLayer(currentsLayer);
+  }
+}
+
+/* ── Real-time GPS navigation ─────────────────────────────────────── */
+
+function _routeLineString() {
+  if (!currentRouteData || !currentRouteData.waypoints) return null;
+  const coords = currentRouteData.waypoints
+    .filter(w => w.coordinates && w.coordinates.length >= 2)
+    .map(w => [w.coordinates[0], w.coordinates[1]]); // turf wants [lon, lat]
+  if (coords.length < 2) return null;
+  return turf.lineString(coords);
+}
+
+function _shipIcon(headingDeg) {
+  return L.divIcon({
+    className: 'ship-marker-icon',
+    html: `<div style="
+      width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+      transform:rotate(${headingDeg||0}deg);transition:transform 0.3s ease;
+    ">
+      <svg viewBox="0 0 24 24" width="22" height="22"
+           style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6));color:#fbbf24">
+        <polygon points="12,2 18,20 12,16 6,20" fill="currentColor"
+                 stroke="#0b1120" stroke-width="1.2" stroke-linejoin="round"/>
+      </svg>
+    </div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+}
+
+function _haversineNm(a, b) {
+  // a, b: [lon, lat]
+  const R = 3440.065; // NM
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b[1] - a[1]);
+  const dLon = toRad(b[0] - a[0]);
+  const lat1 = toRad(a[1]);
+  const lat2 = toRad(b[1]);
+  const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function startNavigation() {
+  if (!currentRouteData || !currentRouteData.waypoints || currentRouteData.waypoints.length < 2) {
+    notify('Calculate a route first.', 'err');
+    return;
+  }
+  if (!('geolocation' in navigator)) {
+    notify('Geolocation not supported by this browser.', 'err');
+    return;
+  }
+  if (navigationState) return;
+
+  const line = _routeLineString();
+  if (!line) {
+    notify('Route has no valid coordinates.', 'err');
+    return;
+  }
+
+  const shipMarker = L.marker([0, 0], {
+    pane: 'routePane',
+    icon: _shipIcon(0),
+    zIndexOffset: 1000,
+  }).addTo(routeLayer);
+
+  navigationState = {
+    watchId: null,
+    line,
+    shipMarker,
+    lastFix: null,
+    startedAt: Date.now(),
+    totalLengthNm: turf.length(line, { units: 'kilometers' }) / 1.852,
+  };
+
+  document.getElementById('startNavBtn').style.display = 'none';
+  const stopBtn = document.getElementById('stopNavBtn');
+  stopBtn.style.display = 'block';
+  document.getElementById('navResult').style.display = 'flex';
+  document.getElementById('nav-status').textContent = 'Acquiring GPS…';
+
+  navigationState.watchId = navigator.geolocation.watchPosition(
+    updateNavigation,
+    (err) => {
+      console.error('Geolocation error:', err);
+      document.getElementById('nav-status').textContent = `GPS error (${err.code})`;
+      notify('GPS error: ' + (err.message || 'permission denied'), 'err');
+    },
+    { enableHighAccuracy: true, maximumAge: 2000, timeout: 15000 },
+  );
+}
+
+function stopNavigation(silent = false) {
+  if (!navigationState) return;
+  if (navigationState.watchId != null) {
+    navigator.geolocation.clearWatch(navigationState.watchId);
+  }
+  if (navigationState.shipMarker && routeLayer.hasLayer(navigationState.shipMarker)) {
+    routeLayer.removeLayer(navigationState.shipMarker);
+  }
+  navigationState = null;
+  document.getElementById('startNavBtn').style.display = 'block';
+  document.getElementById('stopNavBtn').style.display = 'none';
+  document.getElementById('navResult').style.display = 'none';
+  if (!silent) notify('Navigation stopped');
+}
+
+function updateNavigation(pos) {
+  if (!navigationState) return;
+  const lon = pos.coords.longitude;
+  const lat = pos.coords.latitude;
+  const speedMs = pos.coords.speed;       // may be null
+  const headingGps = pos.coords.heading;  // may be null
+  const here = turf.point([lon, lat]);
+  const snapped = turf.nearestPointOnLine(navigationState.line, here, { units: 'kilometers' });
+  const snappedCoords = snapped.geometry.coordinates;
+
+  // Heading from last fix → this fix (more reliable on stationary tests than pos.heading).
+  let heading = headingGps;
+  if (heading == null && navigationState.lastFix) {
+    const dy = lat - navigationState.lastFix.lat;
+    const dx = lon - navigationState.lastFix.lon;
+    heading = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+  }
+  if (heading == null) heading = 0;
+
+  navigationState.shipMarker
+    .setLatLng([snappedCoords[1], snappedCoords[0]])
+    .setIcon(_shipIcon(heading));
+
+  // Recenter without thrashing if user is panning manually.
+  if (!navigationState.lastFix) {
+    map.flyTo([snappedCoords[1], snappedCoords[0]], Math.max(map.getZoom(), 7), { duration: 0.8 });
+  } else {
+    const bounds = map.getBounds().pad(-0.25);
+    if (!bounds.contains([snappedCoords[1], snappedCoords[0]])) {
+      map.panTo([snappedCoords[1], snappedCoords[0]], { animate: true });
+    }
+  }
+
+  // Progress / next waypoint / ETA.
+  const traveledKm = snapped.properties.location || 0;
+  const traveledNm = traveledKm / 1.852;
+  const totalNm = navigationState.totalLengthNm || 0;
+  const remainingNm = Math.max(0, totalNm - traveledNm);
+  const pct = totalNm > 0 ? Math.min(100, (traveledNm / totalNm) * 100) : 0;
+
+  let nextLabel = '—';
+  let nextNm = null;
+  for (const wp of currentRouteData.waypoints) {
+    if (!wp.coordinates) continue;
+    const d = _haversineNm([lon, lat], wp.coordinates);
+    if (d > 0.05) {
+      nextLabel = wp.name || `WP ${wp.sequence}`;
+      nextNm = d;
+      break;
+    }
+  }
+
+  const speedKn = speedMs != null ? speedMs * 1.94384 : null;
+  let etaTxt = '—';
+  if (speedKn && speedKn > 0.1) {
+    const hours = remainingNm / speedKn;
+    const eta = new Date(Date.now() + hours * 3600 * 1000);
+    etaTxt = eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  document.getElementById('nav-status').textContent = 'Tracking';
+  document.getElementById('nav-pos').textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+  document.getElementById('nav-speed').textContent = speedKn != null ? `${speedKn.toFixed(1)} kn` : '— kn';
+  document.getElementById('nav-heading').textContent = `${heading.toFixed(0)}°`;
+  document.getElementById('nav-progress').textContent = `${pct.toFixed(1)}% (${remainingNm.toFixed(1)} NM left)`;
+  document.getElementById('nav-next').textContent = nextNm != null ? `${nextLabel} · ${nextNm.toFixed(1)} NM` : nextLabel;
+  document.getElementById('nav-eta').textContent = etaTxt;
+
+  navigationState.lastFix = { lat, lon, t: Date.now() };
+}
+
+/* ── AI Reroute ───────────────────────────────────────────────────── */
+
+function _extractRouteVesselId() {
+  if (!currentRouteData) return null;
+  const v = currentRouteData.vessel_id;
+  if (!v) return null;
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return v.$oid || v._id || null;
+  return null;
+}
+
+async function requestAiReroute() {
+  if (!currentRouteData) {
+    notify('Calculate a route first.', 'err');
+    return;
+  }
+
+  const btn = document.getElementById('aiRerouteBtn');
+  btn.disabled = true;
+  const oldText = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span> Reroute…';
+
+  // Use the live GPS fix if we have one; otherwise leave undefined.
+  let currentPosition;
+  if (navigationState && navigationState.lastFix) {
+    currentPosition = [navigationState.lastFix.lon, navigationState.lastFix.lat];
+  }
+
+  const startNode = (currentRouteData.start_port
+    || currentRouteRequest?.start
+    || document.getElementById('startNode').value || '').trim();
+  const endNode = (currentRouteData.end_port
+    || currentRouteRequest?.end
+    || document.getElementById('endNode').value || '').trim();
+
+  const vesselId = selectedRouteVesselId
+    || document.getElementById('vesselSelect').value
+    || '';
+
+  try {
+    // Stateless preview — no DB-backed vessel needed. The server recomputes
+    // the route with current + weather penalties applied and compares to
+    // the stats of the route currently on the map.
+    const resp = await fetch('/api/v1/ai/reroute/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start_node_id: startNode,
+        end_node_id: endNode,
+        optimization_mode: currentStrategy,
+        vessel_id: vesselId && vesselId.length >= 12 ? vesselId : null,
+        current_position: currentPosition,
+        current_stats: {
+          total_distance_nm: currentRouteData.total_distance_nm || 0,
+          estimated_duration_h: currentRouteData.estimated_duration_h || 0,
+          estimated_fuel_tons: currentRouteData.estimated_fuel_tons || 0,
+        },
+        reason: 'manual_evaluation',
+      }),
+    });
+
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.detail || data.message || 'Reroute failed');
+    }
+    renderAiReroute(data);
+  } catch (e) {
+    notify(e.message || 'Reroute failed', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = oldText;
+  }
+}
+
+function renderAiReroute(data) {
+  aiRerouteSuggestion = data;
+  const panel = document.getElementById('rerouteResult');
+  panel.style.display = 'flex';
+
+  const d = data.deltas || {};
+  document.getElementById('rr-status').textContent = data.status || '—';
+  document.getElementById('rr-dist').textContent = d.distance_nm != null ? `${d.distance_nm.toFixed(1)} NM` : '—';
+  document.getElementById('rr-dur').textContent = d.duration_h != null ? `${d.duration_h.toFixed(2)} h` : '—';
+  document.getElementById('rr-fuel').textContent = d.fuel_tons != null ? `${d.fuel_tons.toFixed(2)} t` : '—';
+  document.getElementById('rr-reco').textContent = data.recommendation || '—';
+
+  const wps = data.new_waypoints || [];
+  const applyBtn = document.getElementById('applyRerouteBtn');
+  applyBtn.disabled = !(data.status === 'suggested' && wps.length >= 2);
+
+  // Draw the alternative as a dashed amber polyline overlay.
+  if (window._aiReroutePolyline && routeLayer.hasLayer(window._aiReroutePolyline)) {
+    routeLayer.removeLayer(window._aiReroutePolyline);
+  }
+  if (wps.length >= 2) {
+    const latlngs = wps.map(w => [w.coordinates[1], w.coordinates[0]]);
+    window._aiReroutePolyline = L.polyline(latlngs, {
+      pane: 'routePane',
+      color: '#fbbf24',
+      weight: 3,
+      opacity: 0.95,
+      dashArray: '6 6',
+    }).addTo(routeLayer);
+  }
+
+  if (data.status === 'suggested') {
+    notify('AI suggested a reroute — review the panel.');
+  } else {
+    notify('Current route is already optimal.');
+  }
+}
+
+function applyAiReroute() {
+  if (!aiRerouteSuggestion || !aiRerouteSuggestion.new_waypoints) return;
+  const newRoute = {
+    ...currentRouteData,
+    waypoints: aiRerouteSuggestion.new_waypoints,
+    total_distance_nm: aiRerouteSuggestion.new_route?.total_distance_nm,
+    estimated_duration_h: aiRerouteSuggestion.new_route?.estimated_duration_h,
+    estimated_fuel_tons: aiRerouteSuggestion.new_route?.estimated_fuel_tons,
+    route_mode: 'ai-reroute',
+  };
+  displayRoute(newRoute);
+  fetchRouteWeather(newRoute.waypoints);
+  fetchRouteCurrents(newRoute.waypoints);
+  notify('AI alternative applied as the active route.');
+}
+
+function dismissAiReroute(silent = false) {
+  aiRerouteSuggestion = null;
+  document.getElementById('rerouteResult').style.display = 'none';
+  if (window._aiReroutePolyline && routeLayer && routeLayer.hasLayer(window._aiReroutePolyline)) {
+    routeLayer.removeLayer(window._aiReroutePolyline);
+  }
+  window._aiReroutePolyline = null;
+  if (!silent) notify('Suggestion dismissed');
+}
 
 initMap();
+// Poll zones every 30s, but only when the tab is visible — otherwise
+// background tabs burn through API calls and CPU for nothing the user
+// can see.
 routeRefreshTimer = setInterval(() => {
-  loadZones();
+  if (document.visibilityState === 'visible') {
+    loadZones();
+  }
 }, 30000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    loadZones();
+  }
+});
 </script>
 </body>
 </html>
