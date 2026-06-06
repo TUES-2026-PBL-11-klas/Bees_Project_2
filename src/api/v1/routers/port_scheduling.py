@@ -157,3 +157,53 @@ def cancel_reservation(reservation_id: str):
     if cancelled is None:
         raise HTTPException(status_code=404, detail="Reservation not found")
     return _to_dict(cancelled)
+
+
+# ── Port congestion forecasting ─────────────────────────────────────
+
+
+from datetime import datetime  # noqa: E402
+
+from src.core.services.port_congestion_service import (  # noqa: E402
+    DEFAULT_BUCKET_MINUTES,
+    DEFAULT_CONFIRMED_WEIGHT,
+    DEFAULT_HORIZON_HOURS,
+    PortCongestionService,
+)
+
+
+@router.get("/ports/{port_id}/congestion")
+def get_port_congestion(
+    port_id: str,
+    start_at: Optional[datetime] = Query(
+        default=None,
+        description="UTC timestamp to start the forecast at (defaults to now).",
+    ),
+    horizon_hours: int = Query(default=DEFAULT_HORIZON_HOURS, ge=1, le=24 * 14),
+    bucket_minutes: int = Query(default=DEFAULT_BUCKET_MINUTES, ge=15, le=720),
+    confirmed_weight: float = Query(default=DEFAULT_CONFIRMED_WEIGHT, ge=0.0, le=1.0),
+    history_lookback_days: int = Query(default=90, ge=1, le=365),
+):
+    """
+    Forecast berth occupancy at a port for the next ``horizon_hours``,
+    blending confirmed reservations and a historical baseline.
+
+    Returns per-bucket occupancy, available berth estimates and a
+    congestion score in [0, 1] (higher = busier).
+    """
+    service = PortCongestionService(
+        history_lookback_days=history_lookback_days,
+        confirmed_weight=confirmed_weight,
+    )
+    try:
+        forecast = service.forecast(
+            port_id,
+            start_at=start_at,
+            horizon_hours=horizon_hours,
+            bucket_minutes=bucket_minutes,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return forecast.to_dict()
