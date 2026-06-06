@@ -1,7 +1,9 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
     MONGODB_URI: str = "mongodb://localhost:27017"
     DB_NAME: str = "clearwake"
     APP_PORT: int = 8080
@@ -28,9 +30,5 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "dev-only-jwt-secret-please-replace-in-production"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRES_MINUTES: int = 60
-
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
 
 settings = Settings()
