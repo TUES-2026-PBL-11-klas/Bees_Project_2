@@ -53,10 +53,6 @@ class ETAPredictor:
         self._route_repo = route_repo
         self._vessel_repo = vessel_repo
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
     def predict_eta(self, vessel_id: str, route_id: str) -> dict:
         """
         Compute a predicted ETA for *vessel_id* on *route_id*.
@@ -72,18 +68,14 @@ class ETAPredictor:
         if route is None:
             return {"error": f"Route {route_id} not found."}
 
-        # Determine effective speed.
         speed_knots = DEFAULT_SPEED_KNOTS
         if vessel.specs and vessel.specs.max_speed_knots:
             speed_knots = vessel.specs.max_speed_knots
 
-        # Remaining distance.
         remaining_nm = self._calculate_remaining_distance(vessel, route)
 
-        # Base (uncorrected) ETA.
         original_eta_h = remaining_nm / speed_knots if speed_knots > 0 else 0.0
 
-        # Correction factors.
         weather_factor = self._calculate_weather_factor()
         zone_factor = self._calculate_zone_factor(route)
         vessel_factor = self._calculate_vessel_factor(vessel)
@@ -99,7 +91,6 @@ class ETAPredictor:
 
         confidence = self._calculate_confidence(factors)
 
-        # Persist the prediction.
         try:
             self._ai_repo.create_eta_prediction({
                 "vessel_id": vessel_id,
@@ -133,10 +124,6 @@ class ETAPredictor:
             "remaining_distance_nm": round(remaining_nm, 4),
             "speed_knots": round(speed_knots, 2),
         }
-
-    # ------------------------------------------------------------------
-    # Correction factors
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _calculate_weather_factor() -> float:
@@ -209,10 +196,6 @@ class ETAPredictor:
         v_type = vessel.vessel_type or "general_cargo"
         return _VESSEL_PERFORMANCE.get(v_type, 1.0)
 
-    # ------------------------------------------------------------------
-    # Distance helpers
-    # ------------------------------------------------------------------
-
     def _calculate_remaining_distance(self, vessel, route) -> float:
         """
         Compute the remaining route distance in nautical miles.
@@ -234,7 +217,6 @@ class ETAPredictor:
 
         vessel_lon, vessel_lat = vessel_coords[0], vessel_coords[1]
 
-        # Nearest waypoint index.
         best_idx = 0
         best_dist = float("inf")
         for i, wp in enumerate(route.waypoints):
@@ -247,7 +229,6 @@ class ETAPredictor:
                 best_dist = d
                 best_idx = i
 
-        # Sum remaining legs.
         remaining = best_dist
         for i in range(best_idx, len(route.waypoints) - 1):
             wp_a = route.waypoints[i]
@@ -267,10 +248,6 @@ class ETAPredictor:
 
         return remaining
 
-    # ------------------------------------------------------------------
-    # Confidence
-    # ------------------------------------------------------------------
-
     @staticmethod
     def _calculate_confidence(factors: dict) -> float:
         """
@@ -285,10 +262,6 @@ class ETAPredictor:
             if abs(value - 1.0) > 0.001:
                 confidence -= 0.10
         return max(round(confidence, 4), 0.30)
-
-    # ------------------------------------------------------------------
-    # Geometry utilities
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _haversine_distance(

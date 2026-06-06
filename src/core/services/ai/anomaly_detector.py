@@ -37,10 +37,6 @@ class AnomalyDetector:
         self._route_repo = route_repo
         self._zone_repo = zone_repo
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
     def detect_anomalies(self, vessel_id: str) -> list:
         """
         Run every anomaly check for the given vessel.
@@ -52,7 +48,6 @@ class AnomalyDetector:
             logger.warning("Vessel %s not found — skipping anomaly scan.", vessel_id)
             return []
 
-        # Grab the most recent valid route for context.
         routes = self._route_repo.get_by_vessel(str(vessel.id))
         route = None
         for r in routes:
@@ -80,10 +75,6 @@ class AnomalyDetector:
             len(anomalies),
         )
         return anomalies
-
-    # ------------------------------------------------------------------
-    # Individual checks
-    # ------------------------------------------------------------------
 
     def _check_speed(self, vessel, route) -> Optional[dict]:
         """
@@ -115,7 +106,6 @@ class AnomalyDetector:
 
         vessel_lon, vessel_lat = vessel_coords[0], vessel_coords[1]
 
-        # Distance from vessel to the first waypoint (proxy for progress).
         first_wp = route.waypoints[0]
         if not first_wp.coordinates or len(first_wp.coordinates) < 2:
             return None
@@ -358,10 +348,6 @@ class AnomalyDetector:
             },
         }
 
-    # ------------------------------------------------------------------
-    # Geometry helpers
-    # ------------------------------------------------------------------
-
     @staticmethod
     def _calculate_bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         """
@@ -428,10 +414,6 @@ class AnomalyDetector:
 
         return inside
 
-    # ------------------------------------------------------------------
-    # Route helpers
-    # ------------------------------------------------------------------
-
     def _remaining_distance(self, vessel_lat: float, vessel_lon: float, route) -> float:
         """
         Estimate remaining route distance (NM) from the vessel's
@@ -440,7 +422,6 @@ class AnomalyDetector:
         if not route.waypoints:
             return route.total_distance_nm or 0.0
 
-        # Find the nearest waypoint on the route.
         best_idx = 0
         best_dist = float("inf")
         for i, wp in enumerate(route.waypoints):
@@ -453,8 +434,8 @@ class AnomalyDetector:
                 best_dist = d
                 best_idx = i
 
-        # Sum distances from that waypoint to the end of the route.
-        remaining = best_dist  # distance from vessel to nearest wp
+        remaining = best_dist
+
         for i in range(best_idx, len(route.waypoints) - 1):
             wp_a = route.waypoints[i]
             wp_b = route.waypoints[i + 1]

@@ -15,89 +15,87 @@ from typing import Optional
 
 from src.core.graph import Waypoint
 
-# ---------------------------------------------------------------------------
 # Land bounding boxes (conservative rectangles covering major landmasses)
 # Format: (min_lat, max_lat, min_lon, max_lon)
 # A grid point inside ANY of these boxes is considered "land" and skipped.
-# ---------------------------------------------------------------------------
 
 _LAND_BOXES: list[tuple[float, float, float, float]] = [
-    # ── Africa ───────────────────────────────────────────────────────
+    # Africa
     (-35, 37, -18, 52),
 
-    # ── Europe (mainland) ────────────────────────────────────────────
+    # Europe (mainland)
     (36, 71, -10, 40),
 
-    # ── Asia (mainland bulk) ─────────────────────────────────────────
+    # Asia (mainland bulk)
     (10, 75, 40, 140),
 
-    # ── Indian subcontinent ──────────────────────────────────────────
+    # Indian subcontinent
     (8, 35, 68, 90),
 
-    # ── Southeast Asian peninsula ────────────────────────────────────
+    # Southeast Asian peninsula
     (1, 24, 92, 110),
 
-    # ── China coast / Korea / Japan ──────────────────────────────────
+    # China coast / Korea / Japan
     (22, 55, 100, 145),
 
-    # ── North America ────────────────────────────────────────────────
+    # North America
     (15, 72, -170, -50),
 
-    # ── Central America ──────────────────────────────────────────────
+    # Central America
     (7, 20, -92, -77),
 
-    # ── South America ────────────────────────────────────────────────
+    # South America
     (-56, 13, -82, -34),
 
-    # ── Australia ────────────────────────────────────────────────────
+    # Australia
     (-44, -10, 112, 154),
 
-    # ── New Zealand ──────────────────────────────────────────────────
+    # New Zealand
     (-47, -34, 166, 179),
 
-    # ── Greenland ────────────────────────────────────────────────────
+    # Greenland
     (59, 84, -74, -10),
 
-    # ── Antarctica ───────────────────────────────────────────────────
+    # Antarctica
     (-90, -60, -180, 180),
 
-    # ── Madagascar ───────────────────────────────────────────────────
+    # Madagascar
     (-26, -12, 43, 50),
 
-    # ── Borneo ───────────────────────────────────────────────────────
+    # Borneo
     (-4, 7, 108, 119),
 
-    # ── Sumatra ──────────────────────────────────────────────────────
+    # Sumatra
     (-6, 6, 95, 106),
 
-    # ── Java ─────────────────────────────────────────────────────────
+    # Java
     (-9, -6, 105, 115),
 
-    # ── Papua New Guinea ─────────────────────────────────────────────
+    # Papua New Guinea
     (-10, -1, 140, 155),
 
-    # ── Philippines (Mindanao/Luzon core) ────────────────────────────
+    # Philippines (Mindanao/Luzon core)
     (5, 19, 117, 127),
 
-    # ── Iceland ──────────────────────────────────────────────────────
+    # Iceland
     (63, 67, -25, -13),
 
-    # ── Sri Lanka ────────────────────────────────────────────────────
+    # Sri Lanka
     (6, 10, 79, 82),
 
-    # ── Taiwan ───────────────────────────────────────────────────────
+    # Taiwan
     (22, 26, 120, 122),
 
-    # ── Cuba ─────────────────────────────────────────────────────────
+    # Cuba
     (19, 24, -85, -74),
 
-    # ── Hispaniola ───────────────────────────────────────────────────
+    # Hispaniola
     (17, 20, -75, -68),
 
-    # ── Great Britain ────────────────────────────────────────────────
+    # Great Britain
     (50, 59, -6, 2),
 
-    # ── Ireland ──────────────────────────────────────────────────────
+    # Ireland
     (51, 56, -11, -6),
 ]
 
@@ -207,12 +205,10 @@ _WATER_OVERRIDES: list[tuple[float, float]] = [
 
 def is_ocean(lat: float, lon: float) -> bool:
     """Fast check: return True if (lat, lon) is likely open ocean."""
-    # Check water overrides first (force ocean near critical straits)
     for wlat, wlon in _WATER_OVERRIDES:
         if abs(lat - wlat) <= 2.0 and abs(lon - wlon) <= 2.0:
             return True
 
-    # Check land bounding boxes
     for min_lat, max_lat, min_lon, max_lon in _LAND_BOXES:
         if min_lat <= lat <= max_lat and min_lon <= lon <= max_lon:
             return False

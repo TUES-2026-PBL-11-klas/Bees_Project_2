@@ -1,4 +1,4 @@
-"""Unit tests for CurrentGrid (#77)."""
+"""Unit tests for CurrentGrid."""
 
 import json
 from pathlib import Path

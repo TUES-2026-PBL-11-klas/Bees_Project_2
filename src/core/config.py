@@ -15,7 +15,6 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "info"
     MAP_PROVIDER: str = "carto-voyager"
 
-    # AI Module
     AI_ANOMALY_SPEED_THRESHOLD: float = 2.0
     AI_ANOMALY_COURSE_THRESHOLD: float = 15.0
     AI_REROUTE_FUEL_THRESHOLD: float = 0.05

@@ -28,12 +28,10 @@ class AIService:
     """
 
     def __init__(self) -> None:
-        # Repositories.
         self._ai_repo = AIRepository()
         self._route_repo = RouteRepository()
         self._vessel_repo = VesselRepository()
 
-        # Sub-services.
         self._anomaly_detector = AnomalyDetector(
             self._ai_repo, self._vessel_repo, self._route_repo
         )
@@ -46,10 +44,6 @@ class AIService:
         self._recommendation_engine = RecommendationEngine(
             self._ai_repo, self._route_repo, self._vessel_repo
         )
-
-    # ------------------------------------------------------------------
-    # Rerouting
-    # ------------------------------------------------------------------
 
     def handle_reroute_request(
         self,
@@ -71,10 +65,6 @@ class AIService:
             current_position=current_position,
             force=force,
         )
-
-    # ------------------------------------------------------------------
-    # Recommendations
-    # ------------------------------------------------------------------
 
     def get_recommendations(
         self,
@@ -136,10 +126,6 @@ class AIService:
         result["applied_at"] = datetime.utcnow().isoformat()
         return result
 
-    # ------------------------------------------------------------------
-    # Anomaly detection
-    # ------------------------------------------------------------------
-
     def run_anomaly_scan(self, vessel_id: str) -> list:
         """
         Run a full anomaly scan for *vessel_id*, persist every finding,
@@ -159,17 +145,9 @@ class AIService:
 
         return anomalies
 
-    # ------------------------------------------------------------------
-    # ETA prediction
-    # ------------------------------------------------------------------
-
     def predict_eta(self, vessel_id: str, route_id: str) -> dict:
         """Predict ETA for *vessel_id* on *route_id*."""
         return self._eta_predictor.predict_eta(vessel_id, route_id)
-
-    # ------------------------------------------------------------------
-    # Event handling (called by AIObserver)
-    # ------------------------------------------------------------------
 
     def process_event(self, event) -> None:
         """
@@ -205,10 +183,6 @@ class AIService:
         except Exception:
             logger.exception("Error processing event %s.", event_type)
 
-    # ------------------------------------------------------------------
-    # Recommendation management
-    # ------------------------------------------------------------------
-
     def update_recommendation(self, rec_id: str, data: dict) -> dict:
         """
         Update a recommendation's status or metadata.
@@ -242,10 +216,6 @@ class AIService:
             logger.exception("Failed to fetch anomalies.")
             return []
 
-    # ------------------------------------------------------------------
-    # Private event handlers
-    # ------------------------------------------------------------------
-
     def _handle_zone_change(self, data: dict) -> None:
         """Scan all en-route vessels and evaluate reroutes when a zone changes."""
         new_status = data.get("new_status")
@@ -257,7 +227,6 @@ class AIService:
             new_status,
         )
 
-        # Get all vessels that are currently en route.
         try:
             en_route_vessels = self._vessel_repo.get_by_status("en_route")
         except Exception:

@@ -1,4 +1,4 @@
-"""Data access for port scheduling models (GitHub issue #82)."""
+"""Data access for port scheduling models."""
 
 from __future__ import annotations
 

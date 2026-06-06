@@ -28,10 +28,6 @@ _MARINE_API = "https://marine-api.open-meteo.com/v1/marine"
 _TIMEOUT = 8.0  # seconds per request
 _CACHE_TTL = 3600  # 1 hour
 
-# ---------------------------------------------------------------------------
-# Data model
-# ---------------------------------------------------------------------------
-
 
 @dataclass
 class CurrentVector:
@@ -51,10 +47,6 @@ class CurrentVector:
         ) % 360
 
 
-# ---------------------------------------------------------------------------
-# In-memory cache (grid-snapped to 0.5°)
-# ---------------------------------------------------------------------------
-
 _current_cache: dict[tuple[float, float], tuple[float, CurrentVector]] = {}
 
 
@@ -62,10 +54,6 @@ def _cache_key(lat: float, lon: float) -> tuple[float, float]:
     """Round to 0.5° grid for cache efficiency."""
     return (round(lat * 2) / 2, round(lon * 2) / 2)
 
-
-# ---------------------------------------------------------------------------
-# Stokes-drift approximation
-# ---------------------------------------------------------------------------
 
 
 def _stokes_drift(
@@ -106,10 +94,6 @@ def _stokes_drift(
     return CurrentVector(u, v)
 
 
-# ---------------------------------------------------------------------------
-# Fetching
-# ---------------------------------------------------------------------------
-
 
 async def fetch_current_at_point(lat: float, lon: float) -> CurrentVector:
     """Fetch (or return cached) ocean current estimate for a point.
@@ -124,14 +108,12 @@ async def fetch_current_at_point(lat: float, lon: float) -> CurrentVector:
     key = _cache_key(lat, lon)
     now = time.monotonic()
 
-    # --- cache hit? ---
     cached = _current_cache.get(key)
     if cached is not None:
         ts, vec = cached
         if now - ts < _CACHE_TTL:
             return vec
 
-    # --- fetch from API ---
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             resp = await client.get(
@@ -193,10 +175,6 @@ async def fetch_currents_batch(
     )
 
 
-# ---------------------------------------------------------------------------
-# Heading-effect helper
-# ---------------------------------------------------------------------------
-
 
 def get_current_effect_on_heading(
     current: CurrentVector,
@@ -221,10 +199,6 @@ def get_current_effect_on_heading(
 
     return 1.0 + current_component_knots / vessel_speed_knots
 
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
 
 
 def _first(values: Optional[list]) -> Optional[float]:

@@ -1,4 +1,4 @@
-"""Unit tests for the draft / trim optimizer (#80)."""
+"""Unit tests for the draft / trim optimizer."""
 
 import pytest
 

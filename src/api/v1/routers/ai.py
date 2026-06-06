@@ -34,7 +34,6 @@ def _get_ai_service() -> AIService:
     return _ai_service
 
 
-# ── POST /api/v1/ai/reroute ──────────────────────────────────────────
 
 @router.post("/reroute", response_model=RerouteResponse)
 def request_reroute(request: RerouteRequest):
@@ -63,8 +62,6 @@ def request_reroute(request: RerouteRequest):
 
     return result
 
-
-# ── POST /api/v1/ai/reroute/preview ──────────────────────────────────
 
 
 @router.post("/reroute/preview")
@@ -152,9 +149,9 @@ async def preview_reroute(request: ReroutePreviewRequest):
             wind_s = w.get("wind_speed_10m")
             penalty = 0.0
             if wave_h is not None:
-                penalty += max(0.0, (float(wave_h) - 1.0) / 4.0)   # 1m=0, 5m=1.0
+                penalty += max(0.0, (float(wave_h) - 1.0) / 4.0)
             if wind_s is not None:
-                penalty += max(0.0, (float(wind_s) - 30.0) / 50.0)  # 30km/h=0, 80=1.0
+                penalty += max(0.0, (float(wind_s) - 30.0) / 50.0)
             weather_data[(lat, lon)] = min(1.5, penalty)
     except Exception as exc:
         logger.info("Skipping environmental sampling for reroute: %s", exc)
@@ -241,8 +238,6 @@ async def preview_reroute(request: ReroutePreviewRequest):
     }
 
 
-# ── POST /api/v1/ai/reroute/apply ────────────────────────────────────
-
 
 @router.post("/reroute/apply")
 def apply_reroute(request: ApplyRerouteRequest):
@@ -271,8 +266,6 @@ def apply_reroute(request: ApplyRerouteRequest):
     return result
 
 
-# ── POST /api/v1/ai/recommendations/generate ─────────────────────────
-
 
 @router.post("/recommendations/generate", response_model=List[RecommendationOut])
 def generate_recommendations(request: GenerateRecommendationsRequest):
@@ -296,7 +289,6 @@ def generate_recommendations(request: GenerateRecommendationsRequest):
     return results
 
 
-# ── GET /api/v1/ai/recommendations ───────────────────────────────────
 
 @router.get("/recommendations", response_model=List[RecommendationOut])
 def get_recommendations(
@@ -333,7 +325,6 @@ def get_recommendations(
     return results
 
 
-# ── GET /api/v1/ai/anomalies ─────────────────────────────────────────
 
 @router.get("/anomalies", response_model=List[AnomalyOut])
 def get_anomalies(
@@ -352,7 +343,6 @@ def get_anomalies(
     return results
 
 
-# ── POST /api/v1/ai/anomalies/scan/{vessel_id} ──────────────────────
 
 @router.post("/anomalies/scan/{vessel_id}", response_model=List[AnomalyOut])
 def scan_anomalies(vessel_id: str):
@@ -370,7 +360,6 @@ def scan_anomalies(vessel_id: str):
     return results
 
 
-# ── GET /api/v1/ai/eta/{vessel_id}/{route_id} ────────────────────────
 
 @router.get("/eta/{vessel_id}/{route_id}", response_model=ETAPredictionOut)
 def get_eta_prediction(vessel_id: str, route_id: str):
@@ -388,7 +377,6 @@ def get_eta_prediction(vessel_id: str, route_id: str):
     return result
 
 
-# ── PATCH /api/v1/ai/recommendations/{rec_id} ────────────────────────
 
 @router.patch("/recommendations/{rec_id}", response_model=RecommendationOut)
 def update_recommendation(rec_id: str, body: RecommendationUpdate):
@@ -406,7 +394,6 @@ def update_recommendation(rec_id: str, body: RecommendationUpdate):
     return result
 
 
-# ── WebSocket /ws/ai/notifications ────────────────────────────────────
 
 async def ws_notifications(websocket: WebSocket):
     """
@@ -422,9 +409,7 @@ async def ws_notifications(websocket: WebSocket):
 
     try:
         while True:
-            # Keep the connection alive; client can send pings or commands
             data = await websocket.receive_text()
-            # Echo back as acknowledgement
             await websocket.send_json({
                 "event_type": "ack",
                 "payload": {"message": data},

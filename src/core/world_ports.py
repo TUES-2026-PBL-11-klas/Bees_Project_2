@@ -15,9 +15,6 @@ Keys per entry:
 
 WORLD_PORTS: list[dict] = [
 
-    # =====================================================================
-    #  BLACK SEA  (backward-compatible — exact same IDs & coords)
-    # =====================================================================
     dict(port_id="VARNA", lat=43.2141, lon=27.9147, name="Varna", draft=14.0, aliases=("varna",)),
     dict(port_id="CONSTANTA", lat=44.1598, lon=28.6348, name="Constanța", draft=19.0, aliases=("constanta", "constantza")),
     dict(port_id="ODESSA", lat=46.4825, lon=30.7233, name="Odessa", draft=13.0, aliases=("odesa", "odessa")),
@@ -26,15 +23,9 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="SEVASTOPOL", lat=44.6054, lon=33.5254, name="Sevastopol", draft=12.0, aliases=("sevastopol",)),
     dict(port_id="BURGAS", lat=42.4975, lon=27.4728, name="Burgas", draft=12.5, aliases=("burgas", "bourgas")),
 
-    # =====================================================================
-    #  TURKISH STRAITS  (backward-compatible)
-    # =====================================================================
     dict(port_id="ISTANBUL", lat=41.0082, lon=28.9784, name="Istanbul", draft=15.0, aliases=("istanbul", "constantinople")),
     dict(port_id="CANAKKALE", lat=40.1553, lon=26.4142, name="Çanakkale", draft=15.0, aliases=("canakkale", "dardanelles", "gallipoli")),
 
-    # =====================================================================
-    #  GREECE  (backward-compatible)
-    # =====================================================================
     dict(port_id="THESSALONIKI", lat=40.6401, lon=22.9444, name="Thessaloniki", draft=12.0, aliases=("thessaloniki", "saloniki", "salonica")),
     dict(port_id="PIRAEUS", lat=37.9475, lon=23.6425, name="Piraeus", draft=18.0, aliases=("piraeus", "athens", "pireas")),
     dict(port_id="HERAKLION", lat=35.3387, lon=25.1442, name="Heraklion", draft=12.0, aliases=("heraklion", "iraklion", "crete")),
@@ -42,9 +33,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="VOLOS", lat=39.3600, lon=22.9440, name="Volos", draft=10.0, aliases=("volos",)),
     dict(port_id="CORFU", lat=39.6243, lon=19.9217, name="Corfu", draft=10.0, aliases=("corfu", "kerkyra")),
 
-    # =====================================================================
-    #  TURKEY  (backward-compatible + new)
-    # =====================================================================
     dict(port_id="IZMIR", lat=38.4192, lon=27.1287, name="Izmir", draft=14.0, aliases=("izmir", "smyrna")),
     dict(port_id="ANTALYA", lat=36.8841, lon=30.7056, name="Antalya", draft=12.0, aliases=("antalya",)),
     dict(port_id="MERSIN", lat=36.7990, lon=34.6380, name="Mersin", draft=14.0, aliases=("mersin", "icel")),
@@ -52,9 +40,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="TRABZON", lat=41.0027, lon=39.7168, name="Trabzon", draft=10.0, aliases=("trabzon", "trebizond")),
     dict(port_id="SAMSUN", lat=41.2867, lon=36.3300, name="Samsun", draft=12.0, aliases=("samsun",)),
 
-    # =====================================================================
-    #  EASTERN MEDITERRANEAN  (backward-compatible + new)
-    # =====================================================================
     dict(port_id="LIMASSOL", lat=34.6747, lon=33.0420, name="Limassol", draft=14.0, aliases=("limassol", "lemesos", "cyprus")),
     dict(port_id="BEIRUT", lat=33.9000, lon=35.5000, name="Beirut", draft=12.0, aliases=("beirut",)),
     dict(port_id="HAIFA", lat=32.8192, lon=34.9983, name="Haifa", draft=13.7, aliases=("haifa",)),
@@ -65,9 +50,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="TARTUS", lat=34.8833, lon=35.8667, name="Tartus", draft=10.0, aliases=("tartus",)),
     dict(port_id="DAMIETTA", lat=31.4167, lon=31.8000, name="Damietta", draft=14.5, aliases=("damietta", "dumyat")),
 
-    # =====================================================================
-    #  RED SEA / SUEZ  (backward-compatible + new)
-    # =====================================================================
     dict(port_id="SUEZ", lat=29.9668, lon=32.5498, name="Suez", draft=20.1, aliases=("suez", "suez canal")),
     dict(port_id="JEDDAH", lat=21.4858, lon=39.1925, name="Jeddah", draft=16.0, aliases=("jeddah", "jiddah")),
     dict(port_id="YANBU", lat=24.0883, lon=38.0633, name="Yanbu", draft=16.0, aliases=("yanbu",)),
@@ -78,9 +60,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="PORT_SUDAN", lat=19.6158, lon=37.2164, name="Port Sudan", draft=11.0, aliases=("port sudan",)),
     dict(port_id="HODEIDAH", lat=14.7980, lon=42.9540, name="Hodeidah", draft=9.0, aliases=("hodeidah", "hudaydah")),
 
-    # =====================================================================
-    #  NORTH AFRICA  (backward-compatible + new)
-    # =====================================================================
     dict(port_id="BENGHAZI", lat=32.1167, lon=20.0667, name="Benghazi", draft=10.0, aliases=("benghazi",)),
     dict(port_id="TRIPOLI_LY", lat=32.8752, lon=13.1875, name="Tripoli (Libya)", draft=10.0, aliases=("tripoli", "tarabulus")),
     dict(port_id="TUNIS", lat=36.8065, lon=10.1815, name="Tunis", draft=10.5, aliases=("tunis", "la goulette")),
@@ -97,9 +76,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="TANGER_MED", lat=35.8900, lon=-5.5100, name="Tanger Med", draft=18.0, aliases=("tanger med", "tangier med")),
     dict(port_id="MISRATA", lat=32.3754, lon=15.0925, name="Misrata", draft=9.0, aliases=("misrata", "misurata")),
 
-    # =====================================================================
-    #  ITALY  (backward-compatible + new)
-    # =====================================================================
     dict(port_id="VENICE", lat=45.4408, lon=12.3155, name="Venice", draft=10.0, aliases=("venice", "venezia")),
     dict(port_id="TRIESTE", lat=45.6495, lon=13.7768, name="Trieste", draft=17.0, aliases=("trieste",)),
     dict(port_id="ANCONA", lat=43.6158, lon=13.5184, name="Ancona", draft=12.0, aliases=("ancona",)),
@@ -119,14 +95,8 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="BRINDISI", lat=40.6367, lon=17.9467, name="Brindisi", draft=12.0, aliases=("brindisi",)),
     dict(port_id="AUGUSTA", lat=37.2167, lon=15.2167, name="Augusta", draft=17.0, aliases=("augusta",)),
 
-    # =====================================================================
-    #  MALTA
-    # =====================================================================
     dict(port_id="MALTA", lat=35.9042, lon=14.5189, name="Valletta (Malta)", draft=17.0, aliases=("malta", "valletta")),
 
-    # =====================================================================
-    #  ADRIATIC (Croatia, Montenegro, Slovenia, Albania)
-    # =====================================================================
     dict(port_id="DUBROVNIK", lat=42.6507, lon=17.8947, name="Dubrovnik", draft=10.0, aliases=("dubrovnik",)),
     dict(port_id="SPLIT", lat=43.5081, lon=16.4402, name="Split", draft=12.0, aliases=("split",)),
     dict(port_id="RIJEKA", lat=45.3271, lon=14.4422, name="Rijeka", draft=13.0, aliases=("rijeka", "fiume")),
@@ -134,9 +104,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="BAR", lat=42.0912, lon=19.0970, name="Bar", draft=12.0, aliases=("bar", "montenegro")),
     dict(port_id="DURRES", lat=41.3200, lon=19.4500, name="Durrës", draft=10.0, aliases=("durres", "durazzo")),
 
-    # =====================================================================
-    #  SPAIN  (backward-compatible + new)
-    # =====================================================================
     dict(port_id="BARCELONA", lat=41.3851, lon=2.1734, name="Barcelona", draft=16.0, aliases=("barcelona",)),
     dict(port_id="VALENCIA", lat=39.4699, lon=-0.3763, name="Valencia", draft=16.0, aliases=("valencia",)),
     dict(port_id="CARTAGENA", lat=37.6000, lon=-0.9900, name="Cartagena", draft=14.0, aliases=("cartagena",)),
@@ -153,9 +120,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="HUELVA", lat=37.2571, lon=-6.9500, name="Huelva", draft=13.5, aliases=("huelva",)),
     dict(port_id="PALMA_MALLORCA", lat=39.5696, lon=2.6502, name="Palma de Mallorca", draft=12.0, aliases=("palma", "mallorca")),
 
-    # =====================================================================
-    #  FRANCE  (backward-compatible + new)
-    # =====================================================================
     dict(port_id="MARSEILLE", lat=43.2965, lon=5.3698, name="Marseille", draft=14.5, aliases=("marseille", "marsiglia")),
     dict(port_id="SETE", lat=43.4036, lon=3.6966, name="Sète", draft=10.0, aliases=("sete",)),
     dict(port_id="LE_HAVRE", lat=49.4944, lon=0.1079, name="Le Havre", draft=15.5, aliases=("le havre",)),
@@ -167,21 +131,12 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="ROUEN", lat=49.4500, lon=1.0833, name="Rouen", draft=11.0, aliases=("rouen",)),
     dict(port_id="FOS_SUR_MER", lat=43.4069, lon=4.9431, name="Fos-sur-Mer", draft=16.0, aliases=("fos", "fos sur mer")),
 
-    # =====================================================================
-    #  PORTUGAL  (backward-compatible + new)
-    # =====================================================================
     dict(port_id="LISBON", lat=38.7223, lon=-9.1393, name="Lisbon", draft=14.5, aliases=("lisbon", "lisboa")),
     dict(port_id="SINES", lat=37.9567, lon=-8.8717, name="Sines", draft=28.0, aliases=("sines",)),
     dict(port_id="LEIXOES", lat=41.1833, lon=-8.7000, name="Leixões", draft=12.0, aliases=("leixoes", "porto", "oporto")),
 
-    # =====================================================================
-    #  GIBRALTAR
-    # =====================================================================
     dict(port_id="GIBRALTAR", lat=36.1408, lon=-5.3536, name="Gibraltar", draft=11.0, aliases=("gibraltar", "gib")),
 
-    # =====================================================================
-    #  NORTHERN EUROPE  (backward-compatible + new)
-    # =====================================================================
     dict(port_id="ROTTERDAM", lat=51.9225, lon=4.4792, name="Rotterdam", draft=24.0, aliases=("rotterdam",)),
     dict(port_id="ANTWERP", lat=51.2194, lon=4.4025, name="Antwerp", draft=16.0, aliases=("antwerp", "anvers", "antwerpen")),
     dict(port_id="HAMBURG", lat=53.5511, lon=9.9937, name="Hamburg", draft=15.0, aliases=("hamburg",)),
@@ -200,9 +155,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="DOVER", lat=51.1167, lon=1.3167, name="Dover", draft=8.0, aliases=("dover",)),
     dict(port_id="TEESPORT", lat=54.6000, lon=-1.1500, name="Teesport", draft=14.0, aliases=("teesport", "tees")),
 
-    # =====================================================================
-    #  SCANDINAVIA & BALTICS
-    # =====================================================================
     dict(port_id="COPENHAGEN", lat=55.6761, lon=12.5683, name="Copenhagen", draft=12.0, aliases=("copenhagen", "kobenhavn")),
     dict(port_id="AARHUS", lat=56.1500, lon=10.2167, name="Aarhus", draft=12.0, aliases=("aarhus",)),
     dict(port_id="OSLO", lat=59.9139, lon=10.7522, name="Oslo", draft=10.0, aliases=("oslo",)),
@@ -230,9 +182,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="KOTKA", lat=60.4664, lon=26.9458, name="Kotka", draft=15.3, aliases=("kotka",)),
     dict(port_id="VENTSPILS", lat=57.3942, lon=21.5606, name="Ventspils", draft=15.0, aliases=("ventspils",)),
 
-    # =====================================================================
-    #  BRITISH ISLES & IRELAND
-    # =====================================================================
     dict(port_id="DUBLIN", lat=53.3498, lon=-6.2603, name="Dublin", draft=10.0, aliases=("dublin",)),
     dict(port_id="CORK", lat=51.8503, lon=-8.2943, name="Cork", draft=14.0, aliases=("cork", "cobh")),
     dict(port_id="BELFAST", lat=54.5973, lon=-5.9301, name="Belfast", draft=9.0, aliases=("belfast",)),
@@ -241,9 +190,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="GLASGOW", lat=55.8630, lon=-4.2666, name="Glasgow (Clydeport)", draft=8.0, aliases=("glasgow", "clydeport")),
     dict(port_id="BRISTOL", lat=51.4545, lon=-2.5879, name="Bristol", draft=14.5, aliases=("bristol",)),
 
-    # =====================================================================
-    #  PERSIAN GULF & ARABIAN SEA
-    # =====================================================================
     dict(port_id="DUBAI", lat=25.2769, lon=55.2962, name="Dubai (Jebel Ali)", draft=17.0, aliases=("dubai", "jebel ali")),
     dict(port_id="ABU_DHABI", lat=24.5318, lon=54.6501, name="Abu Dhabi", draft=15.0, aliases=("abu dhabi",)),
     dict(port_id="FUJAIRAH", lat=25.1164, lon=56.3361, name="Fujairah", draft=16.0, aliases=("fujairah",)),
@@ -260,9 +206,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="KHARG_ISLAND", lat=29.2400, lon=50.3200, name="Kharg Island", draft=22.0, aliases=("kharg", "kharg island")),
     dict(port_id="RAS_LAFFAN", lat=25.9100, lon=51.5500, name="Ras Laffan", draft=14.0, aliases=("ras laffan",)),
 
-    # =====================================================================
-    #  EAST AFRICA
-    # =====================================================================
     dict(port_id="MOMBASA", lat=-4.0435, lon=39.6682, name="Mombasa", draft=13.0, aliases=("mombasa",)),
     dict(port_id="DAR_ES_SALAAM", lat=-6.8235, lon=39.2695, name="Dar es Salaam", draft=11.0, aliases=("dar es salaam", "dar")),
     dict(port_id="ZANZIBAR", lat=-6.1659, lon=39.1881, name="Zanzibar", draft=7.0, aliases=("zanzibar",)),
@@ -275,9 +218,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="TOAMASINA", lat=-18.1443, lon=49.3958, name="Toamasina", draft=10.0, aliases=("toamasina", "tamatave")),
     dict(port_id="LAMU", lat=-2.2717, lon=40.9020, name="Lamu", draft=14.0, aliases=("lamu",)),
 
-    # =====================================================================
-    #  SOUTHERN AFRICA
-    # =====================================================================
     dict(port_id="DURBAN", lat=-29.8587, lon=31.0218, name="Durban", draft=12.8, aliases=("durban",)),
     dict(port_id="CAPE_TOWN", lat=-33.9249, lon=18.4241, name="Cape Town", draft=14.0, aliases=("cape town",)),
     dict(port_id="PORT_ELIZABETH", lat=-33.7610, lon=25.6022, name="Port Elizabeth (Gqeberha)", draft=14.0, aliases=("port elizabeth", "gqeberha")),
@@ -285,9 +225,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="SALDANHA", lat=-33.0053, lon=17.9381, name="Saldanha Bay", draft=21.5, aliases=("saldanha",)),
     dict(port_id="WALVIS_BAY", lat=-22.9575, lon=14.5053, name="Walvis Bay", draft=14.5, aliases=("walvis bay",)),
 
-    # =====================================================================
-    #  WEST AFRICA
-    # =====================================================================
     dict(port_id="LAGOS", lat=6.4531, lon=3.3958, name="Lagos (Apapa/Tin Can)", draft=13.5, aliases=("lagos", "apapa", "tin can")),
     dict(port_id="TEMA", lat=5.6333, lon=-0.0167, name="Tema", draft=12.0, aliases=("tema",)),
     dict(port_id="ABIDJAN", lat=5.2500, lon=-4.0167, name="Abidjan", draft=12.0, aliases=("abidjan",)),
@@ -308,9 +245,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="MONROVIA", lat=6.3156, lon=-10.8074, name="Monrovia", draft=12.0, aliases=("monrovia",)),
     dict(port_id="NAMIBE", lat=-15.1962, lon=12.1525, name="Namibe", draft=10.0, aliases=("namibe",)),
 
-    # =====================================================================
-    #  SOUTH ASIA (India, Sri Lanka, Pakistan, Bangladesh, Myanmar)
-    # =====================================================================
     dict(port_id="MUMBAI", lat=18.9548, lon=72.8362, name="Mumbai (JNPT/Nhava Sheva)", draft=14.0, aliases=("mumbai", "bombay", "nhava sheva", "jnpt")),
     dict(port_id="CHENNAI", lat=13.0827, lon=80.2707, name="Chennai", draft=16.5, aliases=("chennai", "madras")),
     dict(port_id="KOLKATA", lat=22.5726, lon=88.3639, name="Kolkata (Haldia)", draft=8.5, aliases=("kolkata", "calcutta", "haldia")),
@@ -330,9 +264,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="MONGLA", lat=22.4900, lon=89.5900, name="Mongla", draft=7.5, aliases=("mongla",)),
     dict(port_id="YANGON", lat=16.8661, lon=96.1951, name="Yangon (Thilawa)", draft=9.0, aliases=("yangon", "rangoon", "thilawa")),
 
-    # =====================================================================
-    #  SOUTHEAST ASIA
-    # =====================================================================
     dict(port_id="SINGAPORE", lat=1.2644, lon=103.8222, name="Singapore", draft=16.0, aliases=("singapore",)),
     dict(port_id="PORT_KLANG", lat=3.0000, lon=101.3833, name="Port Klang", draft=15.0, aliases=("port klang", "klang")),
     dict(port_id="PENANG", lat=5.4141, lon=100.3288, name="Penang", draft=11.0, aliases=("penang",)),
@@ -357,9 +288,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="BANJARMASIN", lat=-3.3186, lon=114.5944, name="Banjarmasin", draft=7.0, aliases=("banjarmasin",)),
     dict(port_id="BRUNEI", lat=5.0000, lon=115.0667, name="Muara (Brunei)", draft=12.0, aliases=("brunei", "muara")),
 
-    # =====================================================================
-    #  EAST ASIA
-    # =====================================================================
     dict(port_id="SHANGHAI", lat=31.2304, lon=121.4737, name="Shanghai", draft=16.0, aliases=("shanghai",)),
     dict(port_id="SHENZHEN", lat=22.4800, lon=114.0800, name="Shenzhen (Yantian)", draft=16.0, aliases=("shenzhen", "yantian")),
     dict(port_id="NINGBO", lat=29.8683, lon=121.5440, name="Ningbo-Zhoushan", draft=22.5, aliases=("ningbo", "zhoushan")),
@@ -392,9 +320,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="ZHANJIANG", lat=21.1959, lon=110.4038, name="Zhanjiang", draft=14.0, aliases=("zhanjiang",)),
     dict(port_id="HAIKOU", lat=20.0444, lon=110.3500, name="Haikou (Hainan)", draft=10.0, aliases=("haikou", "hainan")),
 
-    # =====================================================================
-    #  OCEANIA (Australia, New Zealand, Pacific)
-    # =====================================================================
     dict(port_id="SYDNEY", lat=-33.8688, lon=151.2093, name="Sydney", draft=16.0, aliases=("sydney",)),
     dict(port_id="MELBOURNE", lat=-37.8136, lon=144.9631, name="Melbourne", draft=14.0, aliases=("melbourne",)),
     dict(port_id="BRISBANE", lat=-27.3649, lon=153.1010, name="Brisbane", draft=14.0, aliases=("brisbane",)),
@@ -419,9 +344,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="APIA", lat=-13.8333, lon=-171.7833, name="Apia (Samoa)", draft=9.0, aliases=("apia", "samoa")),
     dict(port_id="GUAM", lat=13.4443, lon=144.7937, name="Guam (Apra Harbor)", draft=12.0, aliases=("guam", "apra")),
 
-    # =====================================================================
-    #  NORTH AMERICA — EAST COAST & GULF
-    # =====================================================================
     dict(port_id="NEW_YORK", lat=40.6840, lon=-74.0447, name="New York / New Jersey", draft=15.2, aliases=("new york", "newark", "elizabeth", "nyc")),
     dict(port_id="HOUSTON", lat=29.7604, lon=-95.3698, name="Houston", draft=14.0, aliases=("houston",)),
     dict(port_id="NEW_ORLEANS", lat=29.9511, lon=-90.0715, name="New Orleans", draft=14.0, aliases=("new orleans", "nola")),
@@ -446,9 +368,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="SEPT_ILES", lat=50.2167, lon=-66.3833, name="Sept-Îles", draft=18.0, aliases=("sept iles",)),
     dict(port_id="WILMINGTON_NC", lat=34.2257, lon=-77.9447, name="Wilmington (NC)", draft=12.2, aliases=("wilmington",)),
 
-    # =====================================================================
-    #  NORTH AMERICA — WEST COAST
-    # =====================================================================
     dict(port_id="LOS_ANGELES", lat=33.7361, lon=-118.2922, name="Los Angeles", draft=16.2, aliases=("los angeles", "la", "san pedro")),
     dict(port_id="LONG_BEACH", lat=33.7701, lon=-118.1937, name="Long Beach", draft=16.2, aliases=("long beach",)),
     dict(port_id="OAKLAND", lat=37.7955, lon=-122.2794, name="Oakland", draft=15.2, aliases=("oakland",)),
@@ -464,9 +383,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="LAZARO_CARDENAS", lat=17.9500, lon=-102.2167, name="Lázaro Cárdenas", draft=16.5, aliases=("lazaro cardenas",)),
     dict(port_id="ENSENADA", lat=31.8667, lon=-116.6167, name="Ensenada", draft=12.0, aliases=("ensenada",)),
 
-    # =====================================================================
-    #  CENTRAL AMERICA & CARIBBEAN
-    # =====================================================================
     dict(port_id="COLON", lat=9.3581, lon=-79.9000, name="Colón (Panama Atlantic)", draft=15.2, aliases=("colon", "cristobal")),
     dict(port_id="BALBOA", lat=8.9667, lon=-79.5667, name="Balboa (Panama Pacific)", draft=15.2, aliases=("balboa", "panama")),
     dict(port_id="KINGSTON_JM", lat=17.9714, lon=-76.7936, name="Kingston (Jamaica)", draft=15.5, aliases=("kingston jamaica",)),
@@ -487,9 +403,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="PUERTO_CORTES", lat=15.8333, lon=-87.9333, name="Puerto Cortés", draft=11.0, aliases=("puerto cortes",)),
     dict(port_id="GUATEMALA_CITY_PORT", lat=15.7000, lon=-88.5833, name="Puerto Barrios (Guatemala)", draft=10.0, aliases=("puerto barrios", "guatemala port")),
 
-    # =====================================================================
-    #  SOUTH AMERICA — EAST COAST
-    # =====================================================================
     dict(port_id="SANTOS", lat=-23.9608, lon=-46.3003, name="Santos", draft=15.0, aliases=("santos",)),
     dict(port_id="BUENOS_AIRES", lat=-34.6037, lon=-58.3816, name="Buenos Aires", draft=10.4, aliases=("buenos aires",)),
     dict(port_id="MONTEVIDEO", lat=-34.9011, lon=-56.1645, name="Montevideo", draft=12.0, aliases=("montevideo",)),
@@ -507,9 +420,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="GEORGETOWN_GY", lat=6.8013, lon=-58.1551, name="Georgetown (Guyana)", draft=6.0, aliases=("georgetown",)),
     dict(port_id="PARAMARIBO", lat=5.8520, lon=-55.2038, name="Paramaribo", draft=6.0, aliases=("paramaribo",)),
 
-    # =====================================================================
-    #  SOUTH AMERICA — WEST COAST
-    # =====================================================================
     dict(port_id="CALLAO", lat=-12.0464, lon=-77.1184, name="Callao (Lima)", draft=14.0, aliases=("callao", "lima")),
     dict(port_id="GUAYAQUIL", lat=-2.2000, lon=-79.9000, name="Guayaquil", draft=10.0, aliases=("guayaquil",)),
     dict(port_id="VALPARAISO", lat=-33.0472, lon=-71.6127, name="Valparaíso", draft=13.5, aliases=("valparaiso",)),
@@ -524,9 +434,6 @@ WORLD_PORTS: list[dict] = [
     dict(port_id="PAITA", lat=-5.0833, lon=-81.1167, name="Paita", draft=10.0, aliases=("paita",)),
     dict(port_id="ESMERALDAS", lat=0.9667, lon=-79.6667, name="Esmeraldas", draft=10.0, aliases=("esmeraldas",)),
 
-    # =====================================================================
-    #  ADDITIONAL GLOBAL STRATEGIC PORTS
-    # =====================================================================
     # Canary Islands / Atlantic islands
     dict(port_id="FUNCHAL", lat=32.6333, lon=-16.9167, name="Funchal (Madeira)", draft=10.0, aliases=("funchal", "madeira")),
     dict(port_id="PRAIA", lat=14.9167, lon=-23.5167, name="Praia (Cape Verde)", draft=10.0, aliases=("praia", "cape verde")),

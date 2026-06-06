@@ -1,5 +1,5 @@
 """
-Gridded ocean-current data with bilinear interpolation (issue #77).
+Gridded ocean-current data with bilinear interpolation.
 
 The standard data source is **GRIB2** (HYCOM, NCEP RTOFS, etc.).
 Parsing native GRIB2 requires ``pygrib`` (libeccodes); if it isn't
@@ -113,7 +113,6 @@ class CurrentGrid:
         return out
 
 
-# ── Loaders ──────────────────────────────────────────────────────────
 
 
 def load_grib2(path: str | Path) -> CurrentGrid:

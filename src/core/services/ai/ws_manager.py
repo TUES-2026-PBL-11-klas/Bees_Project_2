@@ -126,10 +126,6 @@ class WebSocketManager:
         for ws in stale:
             await self.disconnect(ws)
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
     @staticmethod
     def _serialize(message: dict) -> str:
         """Serialise *message* to JSON, encoding datetimes as ISO-8601."""

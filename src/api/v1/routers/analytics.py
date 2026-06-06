@@ -1,4 +1,4 @@
-"""Analytics router (GitHub issue #81)."""
+"""Analytics router."""
 
 from fastapi import APIRouter, HTTPException, Query
 

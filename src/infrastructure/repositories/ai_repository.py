@@ -11,8 +11,6 @@ from src.models.ai_models import (
 
 class AIRepository:
 
-    # -- Anomaly methods ---------------------------------------------------
-
     def create_anomaly(self, data: dict) -> AnomalyRecord:
         anomaly = AnomalyRecord(**data)
         anomaly.save()
@@ -43,8 +41,6 @@ class AIRepository:
         anomaly.reload()
         return anomaly
 
-    # -- Reroute methods ---------------------------------------------------
-
     def create_reroute_log(self, data: dict) -> RerouteLog:
         log = RerouteLog(**data)
         log.save()
@@ -73,8 +69,6 @@ class AIRepository:
         log.update(status=status)
         log.reload()
         return log
-
-    # -- Recommendation methods --------------------------------------------
 
     def create_recommendation(self, data: dict) -> AIRecommendation:
         rec = AIRecommendation(**data)
@@ -114,8 +108,6 @@ class AIRepository:
         rec.update(**data)
         rec.reload()
         return rec
-
-    # -- ETA methods -------------------------------------------------------
 
     def create_eta_prediction(self, data: dict) -> ETAPrediction:
         prediction = ETAPrediction(**data)

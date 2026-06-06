@@ -1,4 +1,4 @@
-"""Optimization router — draft / trim service (GitHub issue #80)."""
+"""Optimization router — draft / trim service."""
 
 from bson import ObjectId
 from fastapi import APIRouter, HTTPException
