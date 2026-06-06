@@ -129,3 +129,54 @@ def delete_zone(zone_id: str):
     if not repo.delete(zone_id):
         raise HTTPException(status_code=404, detail="Zone not found")
     return {"deleted": True}
+
+
+# ---------------------------------------------------------------------------
+# Dynamic storm zones — auto-generate temporary no-go zones from weather
+# ---------------------------------------------------------------------------
+
+from src.core.services.weather_zone_service import (  # noqa: E402
+    WeatherZoneService,
+    refresh_zones_from_live_weather,
+)
+
+
+@router.post("/refresh-from-weather")
+async def refresh_zones_from_weather(
+    valid_hours: int = Query(default=12, ge=1, le=168),
+    wave_height_threshold_m: float = Query(default=4.0, ge=0.0, le=20.0),
+    wind_speed_threshold_ms: float = Query(default=20.0, ge=0.0, le=80.0),
+):
+    """
+    Scan the latest weather samples and upsert temporary storm zones for
+    any region exceeding the wave/wind thresholds; retire zones that
+    have returned to calm.
+
+    Returns a summary listing which region zones were created, extended,
+    retired, or skipped.
+    """
+    return await refresh_zones_from_live_weather(
+        valid_hours=valid_hours,
+        wave_height_threshold_m=wave_height_threshold_m,
+        wind_speed_threshold_ms=wind_speed_threshold_ms,
+    )
+
+
+@router.post("/refresh-from-samples")
+def refresh_zones_from_samples(
+    samples: list[dict],
+    valid_hours: int = Query(default=12, ge=1, le=168),
+    wave_height_threshold_m: float = Query(default=4.0, ge=0.0, le=20.0),
+    wind_speed_threshold_ms: float = Query(default=20.0, ge=0.0, le=80.0),
+):
+    """
+    Same as ``/refresh-from-weather`` but accepts an explicit list of
+    region samples in the body. Useful for tests, replays, or when the
+    caller has its own weather source.
+    """
+    service = WeatherZoneService(
+        wave_height_threshold_m=wave_height_threshold_m,
+        wind_speed_threshold_ms=wind_speed_threshold_ms,
+        valid_hours=valid_hours,
+    )
+    return service.refresh(samples)
