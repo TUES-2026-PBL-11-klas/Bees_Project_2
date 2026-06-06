@@ -1,4 +1,4 @@
-"""Pydantic schemas for the optimization router (#80)."""
+"""Pydantic schemas for the optimization router."""
 
 from typing import Optional
 

@@ -1,5 +1,5 @@
 """
-Draft / trim optimization (GitHub issue #80).
+Draft / trim optimization.
 
 Background
 ----------

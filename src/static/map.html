@@ -14,7 +14,6 @@
 <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7.1.0/turf.min.js"></script>
 <style>
-/* ── Design Tokens ─────────────────────────────────────────────────── */
 :root {
   --bg-primary: #0b1120;
   --bg-secondary: #111827;
@@ -46,11 +45,9 @@
   --transition: 180ms ease;
 }
 
-/* ── Reset & Base ──────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-primary); font-family: var(--sans); color: var(--text-primary); -webkit-font-smoothing: antialiased; }
 
-/* ── Layout ────────────────────────────────────────────────────────── */
 .app { display: flex; width: 100%; height: 100vh; }
 .sidebar {
   width: var(--sidebar-w); flex-shrink: 0;
@@ -63,7 +60,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .map-wrap { flex: 1; position: relative; overflow: hidden; }
 #map { width: 100%; height: 100%; background: var(--bg-primary); }
 
-/* ── Sidebar Header ────────────────────────────────────────────────── */
 .sidebar-header {
   padding: 20px 18px 16px;
   border-bottom: 1px solid var(--border-subtle);
@@ -86,7 +82,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 }
 .brand-sub { font-size: 10px; color: var(--text-muted); letter-spacing: 0.03em; margin-top: 1px; }
 
-/* ── Tabs ──────────────────────────────────────────────────────────── */
 .tabs { display: flex; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; padding: 0 4px; }
 .tab {
   flex: 1; padding: 10px 4px 9px; font-size: 10px; font-weight: 600;
@@ -103,7 +98,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .tab.active svg { opacity: 1; color: var(--accent); }
 
-/* ── Sidebar Content ───────────────────────────────────────────────── */
 .sidebar-content {
   flex: 1; overflow-y: auto; padding: 14px;
   display: flex; flex-direction: column; gap: 14px;
@@ -116,14 +110,12 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .panel.active { display: flex; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
-/* ── Section Labels ────────────────────────────────────────────────── */
 .section-label {
   font-family: var(--mono); font-size: 9px; font-weight: 600;
   letter-spacing: 0.12em; text-transform: uppercase;
   color: var(--text-muted); margin-bottom: 6px;
 }
 
-/* ── Fields ────────────────────────────────────────────────────────── */
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field label { font-size: 11px; color: var(--text-secondary); font-weight: 500; }
 .field input, .field select {
@@ -139,7 +131,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .field input::placeholder { color: var(--text-muted); }
 .field select option { background: var(--bg-tertiary); }
 
-/* ── Strategy Cards ────────────────────────────────────────────────── */
 .strategy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .strategy-card {
   background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
@@ -161,7 +152,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .strategy-name { font-size: 11px; font-weight: 600; color: var(--text-primary); font-family: var(--mono); position: relative; }
 .strategy-desc { font-size: 9px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; position: relative; }
 
-/* ── Buttons ───────────────────────────────────────────────────────── */
 .btn {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   padding: 9px 14px; border-radius: var(--radius-sm);
@@ -184,7 +174,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .btn-danger:hover { background: var(--danger-dim); }
 .btn-sm { padding: 5px 9px; font-size: 10px; }
 
-/* ── Badges ────────────────────────────────────────────────────────── */
 .badge {
   display: inline-flex; align-items: center; gap: 3px;
   padding: 2px 7px; border-radius: 99px;
@@ -198,7 +187,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .badge-canal { background: var(--warn-dim); color: var(--warn); }
 .badge-temporary { background: var(--accent-subtle); color: var(--accent); }
 
-/* ── Zone / Vessel List Items ──────────────────────────────────────── */
 .zone-list { display: flex; flex-direction: column; gap: 6px; }
 .zone-item {
   background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
@@ -212,7 +200,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .zone-item-meta { display: flex; align-items: center; gap: 5px; margin-top: 4px; flex-wrap: wrap; }
 .zone-item-actions { display: flex; gap: 3px; flex-shrink: 0; }
 
-/* ── Vessel Picker ─────────────────────────────────────────────────── */
 .vessel-picker { display: flex; flex-direction: column; gap: 6px; }
 .vessel-card {
   background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
@@ -225,7 +212,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .vessel-card-title { font-size: 12px; font-weight: 500; color: var(--text-primary); }
 .vessel-card-meta { font-size: 10px; color: var(--text-muted); font-family: var(--mono); display: flex; flex-wrap: wrap; gap: 6px; }
 
-/* ── Route Result ──────────────────────────────────────────────────── */
 .route-result {
   background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md); padding: 12px; overflow: hidden;
@@ -234,10 +220,8 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .route-stat-label { color: var(--text-muted); font-weight: 400; }
 .route-stat-val { font-family: var(--mono); color: var(--accent); font-weight: 600; font-size: 11px; }
 
-/* ── Divider ───────────────────────────────────────────────────────── */
 .divider { height: 1px; background: var(--border-subtle); }
 
-/* ── Toggle ────────────────────────────────────────────────────────── */
 .toggle-row { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-secondary); }
 .toggle { position: relative; width: 32px; height: 18px; flex-shrink: 0; }
 .toggle input { opacity: 0; width: 0; height: 0; }
@@ -254,7 +238,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .toggle input:checked + .toggle-slider { background: var(--accent-glow); border-color: var(--accent-dim); }
 .toggle input:checked + .toggle-slider::before { transform: translateX(14px); background: var(--accent); }
 
-/* ── Notification ──────────────────────────────────────────────────── */
 .notif {
   position: fixed; bottom: 20px; right: 20px;
   background: var(--bg-glass); backdrop-filter: blur(16px) saturate(1.6);
@@ -271,7 +254,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .notif.ok { border-color: rgba(74,222,128,0.3); }
 .notif.err { border-color: rgba(251,113,133,0.3); }
 
-/* ── Weather Widget (glassmorphism) ────────────────────────────────── */
 .weather-widget {
   position: absolute; top: 14px; right: 14px;
   background: var(--bg-glass); backdrop-filter: blur(20px) saturate(1.8);
@@ -301,7 +283,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .weather-widget-close:hover { color: var(--text-primary); }
 .weather-widget-close svg { width: 14px; height: 14px; }
 
-/* ── Rain Radar Legend ──────────────────────────────────────────────── */
 .radar-legend {
   position: absolute; bottom: 14px; right: 14px;
   background: var(--bg-glass); backdrop-filter: blur(16px) saturate(1.6);
@@ -358,7 +339,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
   font-family: var(--mono); font-size: 10px; color: var(--text-muted);
 }
 
-/* ── Route Weather Summary ─────────────────────────────────────────── */
 .route-weather {
   background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md); padding: 10px 12px;
@@ -369,7 +349,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .route-weather-label { font-size: 9px; color: var(--text-muted); }
 .route-weather-value { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text-primary); }
 
-/* ── Map Status ────────────────────────────────────────────────────── */
 .map-status {
   position: absolute; bottom: 14px; left: 14px;
   background: var(--bg-glass); backdrop-filter: blur(12px);
@@ -379,11 +358,9 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
   color: var(--text-muted); z-index: 999; pointer-events: none;
 }
 
-/* ── Empty State ───────────────────────────────────────────────────── */
 .empty { text-align: center; padding: 20px 14px; color: var(--text-muted); font-size: 11px; line-height: 1.6; }
 .hint { font-size: 10px; color: var(--text-muted); line-height: 1.5; }
 
-/* ── Loading Overlay ───────────────────────────────────────────────── */
 .loading-overlay {
   position: absolute; inset: 0;
   background: rgba(11,17,32,0.65); backdrop-filter: blur(4px);
@@ -396,7 +373,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .loading-box { text-align: center; color: var(--accent); font-family: var(--mono); font-size: 11px; }
 .loading-box .spinner { width: 22px; height: 22px; border-width: 2px; margin-bottom: 10px; }
 
-/* ── Spinner ───────────────────────────────────────────────────────── */
 .spinner {
   display: inline-block; width: 12px; height: 12px;
   border: 2px solid var(--accent-glow); border-top-color: var(--accent);
@@ -404,7 +380,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Leaflet Overrides ─────────────────────────────────────────────── */
 .leaflet-control-layers {
   background: var(--bg-glass) !important; backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
@@ -431,7 +406,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 }
 .leaflet-popup-tip { background: var(--bg-glass) !important; }
 
-/* ── Weather Region Cards ──────────────────────────────────────────── */
 .weather-region-list { display: flex; flex-direction: column; gap: 6px; }
 .weather-region-card {
   background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
@@ -476,7 +450,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
   font-family: var(--mono); padding: 2px 0;
 }
 
-/* ── Current Arrows ───────────────────────────────────────────────── */
 .current-arrow-icon {
   display: flex; align-items: center; justify-content: center;
 }
@@ -486,7 +459,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
   transition: transform 0.3s ease;
 }
 
-/* ── Route Current Summary ────────────────────────────────────────── */
 .route-current {
   background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md); padding: 10px 12px;
@@ -951,7 +923,6 @@ function applyMaskStyle(layerName) {
   }
 }
 
-/* ── Weather Functions ────────────────────────────────────────────── */
 
 function toggleWeatherClick(enabled) {
   weatherClickEnabled = enabled;
@@ -965,7 +936,6 @@ function toggleCurrentsLayer(enabled) {
   }
 }
 
-/* ── Regional Weather Loading ───────────────────────────────────── */
 
 async function loadRegionalWeather() {
   try {
@@ -1062,12 +1032,10 @@ function renderWeatherMarkers() {
   weatherMarkersLayer.addTo(map);
 }
 
-/* ── Route Currents ──────────────────────────────────────────── */
 
 async function fetchRouteCurrents(waypoints) {
   if (!waypoints || waypoints.length < 2) return;
 
-  // Sample up to 10 points
   const step = Math.max(1, Math.floor(waypoints.length / 10));
   const sampled = [];
   for (let i = 0; i < waypoints.length && sampled.length < 10; i += step) {
@@ -1084,7 +1052,6 @@ async function fetchRouteCurrents(waypoints) {
     if (!resp.ok) return;
     const data = await resp.json();
 
-    // Update UI
     const el = document.getElementById('routeCurrentResult');
     if (!el) return;
     const s = data.summary || {};
@@ -1092,7 +1059,6 @@ async function fetchRouteCurrents(waypoints) {
     document.getElementById('rc-points').textContent = s.point_count != null ? s.point_count : '—';
     el.style.display = 'block';
 
-    // Draw current arrows on map
     if (currentsVisible && data.points && data.points.length) {
       renderCurrentArrows(data.points);
     }
@@ -1133,7 +1099,6 @@ function renderCurrentArrows(points) {
   currentsLayer.addTo(map);
 }
 
-/* ── Rain Radar (RainViewer — free, no API key) ───────────────────── */
 
 async function loadRainViewerRadar() {
   try {
@@ -1146,11 +1111,9 @@ async function loadRainViewerRadar() {
     const allFrames = [...radarFrames, ...nowcastFrames];
     if (!allFrames.length) throw new Error('No radar frames available');
 
-    // Use the most recent frame
     const latest = allFrames[allFrames.length - 1];
     const tileUrl = data.host + latest.path + '/256/{z}/{x}/{y}/4/1_1.png';
 
-    // Remove old layer if exists
     if (radarLayer && map.hasLayer(radarLayer)) {
       map.removeLayer(radarLayer);
     }
@@ -1174,7 +1137,6 @@ async function loadRainViewerRadar() {
       radarLayer.addTo(map);
     }
 
-    // Update legend timestamp
     const time = new Date(latest.time * 1000);
     const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const el = document.getElementById('radarTime');
@@ -1310,7 +1272,6 @@ async function fetchRouteWeather(waypoints) {
   }
 }
 
-/* ── Map Init ─────────────────────────────────────────────────────── */
 
 async function initMap() {
   map = L.map('map', {
@@ -1454,7 +1415,6 @@ async function initMap() {
     notify('Zone shape captured');
   });
 
-  // Weather on map click
   map.on('click', (e) => {
     if (!weatherClickEnabled) return;
     // Don't trigger weather if we're in draw mode
@@ -1477,7 +1437,6 @@ async function initMap() {
   await loadVesselTypes();
   await Promise.all([loadZones(), loadVessels(), loadPortCatalogue()]);
 
-  // Load regional weather
   loadRegionalWeather();
   regionWeatherTimer = setInterval(() => {
     if (document.visibilityState === 'visible') {
@@ -3020,10 +2979,8 @@ async function calculateRoute() {
     displayRoute(route);
     notify(`Route calculated — ${route.waypoints?.length||0} points ✓`);
 
-    // Fetch route weather in background
     fetchRouteWeather(route.waypoints);
 
-    // Fetch route currents in background
     fetchRouteCurrents(route.waypoints);
   } catch(e) {
     notify(e.message||'Calculation failed','err');
@@ -3083,7 +3040,6 @@ function displayRoute(route) {
 
   L.circleMarker(coords[0],{pane:'routePane',radius:7,fillColor:'#4ade80',color:'#fff',weight:2,fillOpacity:1}).bindPopup(`<b>Origin</b>`).addTo(routeLayer);
   L.circleMarker(coords[coords.length-1],{pane:'routePane',radius:7,fillColor:'#fb7185',color:'#fff',weight:2,fillOpacity:1}).bindPopup(`<b>Destination</b>`).addTo(routeLayer);
-  // Only draw markers for named port waypoints
   wps.slice(1,-1).forEach((w, idx) => {
     if (w.point_type === 'port' && w.name) {
       const c = [w.coordinates[1], w.coordinates[0]];
@@ -3136,7 +3092,6 @@ function clearRoute() {
   }
 }
 
-/* ── Real-time GPS navigation ─────────────────────────────────────── */
 
 function _routeLineString() {
   if (!currentRouteData || !currentRouteData.waypoints) return null;
@@ -3312,7 +3267,6 @@ function updateNavigation(pos) {
   navigationState.lastFix = { lat, lon, t: Date.now() };
 }
 
-/* ── AI Reroute ───────────────────────────────────────────────────── */
 
 function _extractRouteVesselId() {
   if (!currentRouteData) return null;

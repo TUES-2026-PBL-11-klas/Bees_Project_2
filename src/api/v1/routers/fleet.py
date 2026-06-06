@@ -1,5 +1,5 @@
 """
-Fleet API — company-scoped vessel CRUD (GitHub issue #88).
+Fleet API — company-scoped vessel CRUD.
 
 Thin wrapper over /api/v1/vessels that:
   * always scopes list operations by company,

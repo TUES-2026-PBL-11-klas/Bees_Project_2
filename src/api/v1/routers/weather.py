@@ -276,7 +276,6 @@ def _sea_state(wave_height: Optional[float]) -> dict:
     return {"number": 9, "label": "Phenomenal"}
 
 
-# ── Region weather cache ─────────────────────────────────────────────────
 
 _REGIONS_CACHE_TTL = 600  # 10 minutes in seconds
 _regions_cache: list[dict] = []
@@ -293,8 +292,6 @@ async def _close_client() -> None:
             pass
         _async_client = None
 
-
-# ── Endpoints ────────────────────────────────────────────────────────────
 
 
 @router.get("/regions")
@@ -316,7 +313,6 @@ async def get_all_regions_weather():
         logger.debug("Returning cached region weather (%d regions)", len(_regions_cache))
         return _regions_cache
 
-    # Fetch weather for every region in parallel
     results = await asyncio.gather(
         *[_fetch_point_weather(r["lat"], r["lon"]) for r in MARITIME_REGIONS],
         return_exceptions=True,
@@ -337,7 +333,6 @@ async def get_all_regions_weather():
         result["sea_state"] = _sea_state(result.get("wave_height"))
         region_weather.append(result)
 
-    # Update cache
     _regions_cache = region_weather
     _regions_cache_time = time.time()
 
@@ -384,7 +379,6 @@ async def get_route_weather(
     if not coords:
         raise HTTPException(status_code=400, detail="No coordinates provided")
 
-    # Sample at most 10 points evenly
     if len(coords) > 10:
         step = len(coords) / 10
         coords = [coords[int(i * step)] for i in range(10)]
@@ -405,7 +399,6 @@ async def get_route_weather(
         r["sea_state"] = _sea_state(r.get("wave_height"))
         weather_points.append(r)
 
-    # Summary across all points
     wave_heights = [p["wave_height"] for p in weather_points if p.get("wave_height") is not None]
     wind_speeds = [p["wind_speed_10m"] for p in weather_points if p.get("wind_speed_10m") is not None]
 
@@ -424,8 +417,6 @@ async def get_route_weather(
 
     return {"summary": summary, "points": weather_points}
 
-
-# ── Ocean-current endpoints ──────────────────────────────────────────────
 
 
 @router.get("/currents")

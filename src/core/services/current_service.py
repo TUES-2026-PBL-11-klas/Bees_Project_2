@@ -24,17 +24,9 @@ logger = logging.getLogger(__name__)
 class OceanCurrentService:
     """High-level facade for ocean-current queries."""
 
-    # ------------------------------------------------------------------
-    # Single-point query
-    # ------------------------------------------------------------------
-
     async def get_current_at(self, lat: float, lon: float) -> CurrentVector:
         """Return the estimated ocean current at *(lat, lon)*."""
         return await fetch_current_at_point(lat, lon)
-
-    # ------------------------------------------------------------------
-    # Route-level query
-    # ------------------------------------------------------------------
 
     async def get_currents_for_route(
         self,
@@ -63,7 +55,6 @@ class OceanCurrentService:
         if not points:
             return []
 
-        # Sample up to 10 points evenly along the route
         if len(points) > 10:
             step = len(points) / 10
             points = [points[int(i * step)] for i in range(10)]
@@ -81,10 +72,6 @@ class OceanCurrentService:
             }
             for pt, c in zip(points, currents)
         ]
-
-    # ------------------------------------------------------------------
-    # Leg-level adjustment
-    # ------------------------------------------------------------------
 
     def compute_leg_adjustment(
         self,

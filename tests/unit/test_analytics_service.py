@@ -1,4 +1,4 @@
-"""Unit tests for AnalyticsService (#81). DB-free — uses stub history records."""
+"""Unit tests for AnalyticsService. DB-free — uses stub history records."""
 
 from dataclasses import dataclass
 from typing import Optional

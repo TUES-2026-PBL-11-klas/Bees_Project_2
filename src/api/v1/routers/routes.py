@@ -349,7 +349,6 @@ def calculate_route(request: RouteCalculationSchema):
         created_route = repo.create(route_data)
         result = json.loads(created_route.to_json())
 
-        # Persist a RouteHistory snapshot for analytics / audit trail
         try:
             history_data = {
                 "route_id": created_route.id,

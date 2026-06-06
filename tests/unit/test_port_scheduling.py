@@ -1,4 +1,4 @@
-"""Unit tests for port scheduling models (#82). Focus on conflict logic."""
+"""Unit tests for port scheduling models. Focus on conflict logic."""
 
 from datetime import datetime, timedelta
 from types import SimpleNamespace

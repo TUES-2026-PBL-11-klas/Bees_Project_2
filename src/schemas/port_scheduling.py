@@ -1,4 +1,4 @@
-"""Pydantic schemas for port scheduling endpoints (GitHub issue #82)."""
+"""Pydantic schemas for port scheduling endpoints."""
 
 from __future__ import annotations
 

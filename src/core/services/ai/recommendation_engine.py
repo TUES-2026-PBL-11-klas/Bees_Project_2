@@ -15,12 +15,10 @@ from src.core.routing.strategy import DEFAULT_SPEED_KNOTS
 
 logger = logging.getLogger(__name__)
 
-# Speed thresholds for fuel-saving advisories (knots).
 _HIGH_SPEED_THRESHOLD = 16.0
 _OPTIMAL_SPEED = 14.0
-_FUEL_SAVINGS_PCT_PER_KNOT = 4.0  # ~4% fuel savings per knot reduced
+_FUEL_SAVINGS_PCT_PER_KNOT = 4.0
 
-# Summer months in the Mediterranean.
 _SUMMER_MONTHS = {5, 6, 7, 8, 9}
 
 
@@ -36,10 +34,6 @@ class RecommendationEngine:
         self._ai_repo = ai_repo
         self._route_repo = route_repo
         self._vessel_repo = vessel_repo
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
 
     def get_recommendations(
         self,
@@ -133,7 +127,6 @@ class RecommendationEngine:
                     if rec is not None:
                         new_recs.append(rec)
 
-        # Persist each recommendation.
         for rec in new_recs:
             try:
                 self._ai_repo.create_recommendation(rec)
@@ -142,10 +135,6 @@ class RecommendationEngine:
 
         logger.info("Generated %d new recommendations.", len(new_recs))
         return new_recs
-
-    # ------------------------------------------------------------------
-    # Generators
-    # ------------------------------------------------------------------
 
     def _generate_route_optimization(
         self, vessel_id: str, company_id: Optional[str] = None

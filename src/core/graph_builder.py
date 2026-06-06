@@ -32,7 +32,6 @@ from src.core.ocean_grid import (
 
 logger = logging.getLogger(__name__)
 
-# ── Module-level singleton ────────────────────────────────────────────
 _graph: Optional[NavigationGraph] = None
 _graph_lock = Lock()
 
@@ -48,7 +47,6 @@ def _load_ports() -> list[dict]:
         return _RAW_PORTS
 
 
-# ── Hand-crafted corridors (straits, canals, restricted passages) ─────
 # These override the auto-generated grid edges with explicit draft /
 # length / beam restrictions where they matter.
 #
@@ -73,7 +71,6 @@ _RESTRICTED_CORRIDORS: list[tuple] = [
     ("WP_BONIFACIO", "WP_WEST_CORSICA", 11.0),
 ]
 
-# ── Direct port-to-port corridors (no restrictions) ──────────────────
 # Connections between nearby ports that should have a direct edge
 # rather than going through the ocean grid, for route quality.
 _DIRECT_CORRIDORS: list[tuple[str, str]] = [
@@ -218,7 +215,6 @@ _LEGACY_WAYPOINTS: list[dict] = [
     dict(port_id="WP_NORTH_AEGEAN", lat=39.50, lon=24.50, name="North Aegean (open sea)"),
     dict(port_id="WP_CENTRAL_AEGEAN", lat=37.50, lon=25.00, name="Central Aegean (open sea)"),
     dict(port_id="WP_CAPE_MALEAS", lat=36.20, lon=23.40, name="Cape Maleas (open sea)"),
-    # ── Black Sea open-water waypoints ────────────────────────────────
     # All deep-water, well clear of any coastline so port-to-port edges
     # routed via them never clip land.
     dict(port_id="WP_BLACK_SEA_WEST", lat=43.50, lon=30.50, name="Western Black Sea (open sea)"),
@@ -346,7 +342,6 @@ _LEGACY_WP_CORRIDORS: list[tuple[str, str]] = [
     ("WP_NORTH_SEA", "ROTTERDAM"),
     ("WP_NORTH_SEA", "ANTWERP"),
     ("WP_NORTH_SEA", "FELIXSTOWE"),
-    # ── Black Sea open-water corridors ────────────────────────────────
     # Connect Black Sea ports to deep-water waypoints so cross-sea routes
     # take an offshore great-circle instead of coast-clipping straight
     # lines (e.g. Burgas → Sevastopol used to detour via Varna).
@@ -375,7 +370,6 @@ def _build_graph() -> NavigationGraph:
     t0 = time.time()
     graph = NavigationGraph()
 
-    # ── 1. Load port data ─────────────────────────────────────────
     raw_ports = _load_ports()
     port_ids: set[str] = set()
 
@@ -391,7 +385,6 @@ def _build_graph() -> NavigationGraph:
 
     logger.info("Loaded %d ports", len(port_ids))
 
-    # ── 2. Add legacy open-sea waypoints ──────────────────────────
     for wp in _LEGACY_WAYPOINTS:
         wid = wp["port_id"]
         if not graph.has_waypoint(wid):
@@ -402,7 +395,6 @@ def _build_graph() -> NavigationGraph:
                 name=wp["name"],
             ))
 
-    # ── 3. Generate ocean grid ────────────────────────────────────
     grid_nodes = generate_ocean_grid(step_deg=5.0)
     grid_index: dict[str, Waypoint] = {}
     for gn in grid_nodes:
@@ -411,7 +403,6 @@ def _build_graph() -> NavigationGraph:
 
     logger.info("Generated %d ocean grid nodes", len(grid_nodes))
 
-    # ── 4. Connect each port to nearest grid nodes ────────────────
     for p in raw_ports:
         pid = p["port_id"]
         nearest = find_nearest_grid_nodes(
@@ -421,7 +412,6 @@ def _build_graph() -> NavigationGraph:
             if not _has_edge(graph, pid, gn.node_id):
                 graph.add_edge(pid, gn.node_id, bidirectional=True)
 
-    # Also connect legacy WP_ nodes to grid
     for wp in _LEGACY_WAYPOINTS:
         wid = wp["port_id"]
         nearest = find_nearest_grid_nodes(
@@ -431,26 +421,22 @@ def _build_graph() -> NavigationGraph:
             if not _has_edge(graph, wid, gn.node_id):
                 graph.add_edge(wid, gn.node_id, bidirectional=True)
 
-    # ── 5. Connect adjacent grid nodes ────────────────────────────
     for gn in grid_nodes:
         neighbours = get_adjacent_grid_ids(gn, grid_index, step_deg=5.0)
         for nb in neighbours:
             if not _has_edge(graph, gn.node_id, nb.node_id):
                 graph.add_edge(gn.node_id, nb.node_id, bidirectional=True)
 
-    # ── 6. Add direct port-to-port corridors ──────────────────────
     for src_id, dst_id in _DIRECT_CORRIDORS:
         if graph.has_waypoint(src_id) and graph.has_waypoint(dst_id):
             if not _has_edge(graph, src_id, dst_id):
                 graph.add_edge(src_id, dst_id, bidirectional=True)
 
-    # ── 7. Add legacy WP corridors ────────────────────────────────
     for src_id, dst_id in _LEGACY_WP_CORRIDORS:
         if graph.has_waypoint(src_id) and graph.has_waypoint(dst_id):
             if not _has_edge(graph, src_id, dst_id):
                 graph.add_edge(src_id, dst_id, bidirectional=True)
 
-    # ── 8. Add restricted corridors (straits/canals) ──────────────
     for corridor in _RESTRICTED_CORRIDORS:
         src_id = corridor[0]
         dst_id = corridor[1]
@@ -459,7 +445,6 @@ def _build_graph() -> NavigationGraph:
         max_beam = corridor[4] if len(corridor) > 4 else None
 
         if graph.has_waypoint(src_id) and graph.has_waypoint(dst_id):
-            # Remove any existing unrestricted edge and replace with restricted
             graph.add_edge(
                 src_id, dst_id, bidirectional=True,
                 max_draft_m=max_draft, max_length_m=max_length, max_beam_m=max_beam,

@@ -1,5 +1,5 @@
 """
-Route analytics service (GitHub issue #81).
+Route analytics service.
 
 Aggregates RouteHistory records into per-vessel / per-strategy summaries:
 average fuel consumption, distance, duration, deviation from estimate,
@@ -77,7 +77,6 @@ class AnalyticsService:
     ) -> None:
         self._history = history_repo or RouteHistoryRepository()
 
-    # ── Per-vessel summary ───────────────────────────────────────────
     def vessel_summary(self, vessel_id: str, limit: int = 200) -> dict:
         entries = self._history.get_by_vessel(vessel_id, limit=limit)
         return {
@@ -91,7 +90,6 @@ class AnalyticsService:
             },
         }
 
-    # ── Per-company summary ──────────────────────────────────────────
     def company_summary(self, company_id: str, limit: int = 500) -> dict:
         entries = self._history.get_by_company(company_id, limit=limit)
         return {
@@ -105,7 +103,6 @@ class AnalyticsService:
             },
         }
 
-    # ── Strategy effectiveness ───────────────────────────────────────
     def strategy_effectiveness(self, limit: int = 1000) -> dict:
         """
         Compare 'fastest' vs 'eco' aggregates over recent history.

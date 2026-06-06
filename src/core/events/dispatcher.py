@@ -43,7 +43,6 @@ class EventDispatcher:
         for observer in observers:
             self._executor.submit(observer.update, event)
 
-        # Push to WebSocket if manager is attached
         if self._ws_manager:
             try:
                 loop = asyncio.get_event_loop()

@@ -5,7 +5,6 @@ from src.core.events.dispatcher import dispatcher
 
 logger = logging.getLogger(__name__)
 
-# AI event types this observer reacts to
 AI_EVENT_TYPES = (
     "ZONE_STATUS_CHANGED",
     "zone_closed",

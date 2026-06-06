@@ -1,5 +1,5 @@
 """
-Port scheduling router (GitHub issue #82).
+Port scheduling router.
 
 Endpoints
 ---------
@@ -46,8 +46,6 @@ def _to_dict(doc) -> dict:
     return json.loads(doc.to_json())
 
 
-# ── Ports CRUD ──────────────────────────────────────────────────────
-
 
 @router.get("/ports")
 def list_ports(limit: int = Query(default=500, ge=1, le=2000)):
@@ -78,8 +76,6 @@ def delete_port(port_id: str):
     return None
 
 
-# ── Port schedule ───────────────────────────────────────────────────
-
 
 @router.get("/ports/{port_id}/schedule")
 def get_port_schedule(port_id: str):
@@ -92,13 +88,10 @@ def get_port_schedule(port_id: str):
 @router.put("/ports/{port_id}/schedule")
 def upsert_port_schedule(port_id: str, payload: PortScheduleSchema):
     data = payload.model_dump()
-    # convert pydantic BlackoutWindow models back to plain dicts
     data["blackouts"] = [b for b in data.get("blackouts", [])]
     schedule = _schedules.upsert(port_id, data)
     return _to_dict(schedule)
 
-
-# ── Dock reservations ───────────────────────────────────────────────
 
 
 @router.get("/dock-reservations")

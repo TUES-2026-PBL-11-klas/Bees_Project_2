@@ -8,7 +8,6 @@ from datetime import datetime, timedelta, timezone
 from mongoengine import connect, disconnect
 from src.core.config import settings
 
-# Connect to database
 connect(db=settings.DB_NAME, host=settings.MONGODB_URI)
 
 from src.models.company import Company
@@ -296,7 +295,6 @@ def create_sample_routes(company_id):
 
     created = 0
     for data in routes_data:
-        # Create route request
         request = RouteRequest(
             company_id=company_id,
             vessel_id=vessels[created % len(vessels)].id if vessels else None,
@@ -306,7 +304,6 @@ def create_sample_routes(company_id):
         )
         request.save()
 
-        # Create calculated route
         route = Route(
             request_id=request.id,
             company_id=company_id,
@@ -318,7 +315,6 @@ def create_sample_routes(company_id):
             estimated_fuel_tons=25.0 + (created * 8),
         )
 
-        # Add waypoints
         origin = data["origin"]["coordinates"]
         dest = data["destination"]["coordinates"]
         route.waypoints = [

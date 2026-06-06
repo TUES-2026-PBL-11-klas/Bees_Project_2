@@ -1,5 +1,5 @@
 """
-Port scheduling models (GitHub issue #82).
+Port scheduling models.
 
 Three documents:
 

@@ -44,10 +44,6 @@ class RerouteEngine:
         self._vessel_repo = vessel_repo
         self._graph = graph or build_navigation_graph()
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
     def evaluate_reroute(
         self,
         vessel_id: str,
@@ -80,7 +76,6 @@ class RerouteEngine:
         if vessel is None:
             return {"status": "error", "message": f"Vessel {vessel_id} not found."}
 
-        # Most recent valid route.
         routes = self._route_repo.get_by_vessel(str(vessel.id))
         original_route = None
         for r in routes:
@@ -94,7 +89,6 @@ class RerouteEngine:
                 "message": "No active route found for the vessel.",
             }
 
-        # Determine vessel position.
         position = current_position
         if position is None and vessel.current_position:
             coords = vessel.current_position.get("coordinates", [])
@@ -109,10 +103,8 @@ class RerouteEngine:
 
         vessel_lon, vessel_lat = position[0], position[1]
 
-        # Build vessel constraints.
         constraints = self._build_vessel_constraints(vessel)
 
-        # Find nearest graph waypoint to vessel.
         start_node = self._find_nearest_waypoint([vessel_lon, vessel_lat], self._graph)
         if start_node is None:
             return {
@@ -120,7 +112,6 @@ class RerouteEngine:
                 "message": "Cannot locate vessel on the navigation graph.",
             }
 
-        # Determine destination from the original route's last waypoint.
         if not original_route.waypoints:
             return {
                 "status": "skipped",
@@ -143,7 +134,6 @@ class RerouteEngine:
                 "message": "Cannot locate destination on the navigation graph.",
             }
 
-        # Calculate the alternative route.
         strategy = (
             EcoStrategy()
             if original_route.optimization_mode == "eco"
@@ -159,7 +149,6 @@ class RerouteEngine:
                 "message": "No alternative route could be found.",
             }
 
-        # Stats for comparison.
         original_stats = {
             "total_distance_nm": original_route.total_distance_nm or 0.0,
             "estimated_duration_h": original_route.estimated_duration_h or 0.0,
@@ -169,7 +158,6 @@ class RerouteEngine:
         new_stats = self._compute_route_stats(new_path, constraints)
         new_waypoints = self._format_waypoints(new_path)
 
-        # Deltas.
         dist_delta = new_stats["total_distance_nm"] - original_stats["total_distance_nm"]
         eta_delta = new_stats["estimated_duration_h"] - original_stats["estimated_duration_h"]
         fuel_delta = new_stats["estimated_fuel_tons"] - original_stats["estimated_fuel_tons"]
@@ -186,7 +174,6 @@ class RerouteEngine:
             else 0.0
         )
 
-        # Decision: should we suggest the reroute?
         urgent_reasons = {"zone_closed", "storm", "emergency", "conflict"}
         is_urgent = reason and reason.lower() in urgent_reasons
 
@@ -199,12 +186,10 @@ class RerouteEngine:
 
         status = "suggested" if should_reroute else "evaluated"
 
-        # Build recommendation text.
         recommendation = self._build_recommendation_text(
             status, reason, fuel_delta, eta_delta, dist_delta, fuel_pct, time_pct
         )
 
-        # Persist the reroute log.
         reroute_data = {
             "vessel_id": vessel_id,
             "original_route_id": str(original_route.id),
@@ -250,10 +235,6 @@ class RerouteEngine:
             "reason": reason or "routine_evaluation",
             "evaluated_at": datetime.utcnow().isoformat(),
         }
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
 
     def _find_nearest_waypoint(self, position: list, graph) -> Optional[str]:
         """
@@ -376,10 +357,6 @@ class RerouteEngine:
             parts.append(f"Shorter by {abs(dist_delta):.1f} NM. ")
 
         return "".join(parts).strip()
-
-    # ------------------------------------------------------------------
-    # Geometry
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _haversine_distance(
