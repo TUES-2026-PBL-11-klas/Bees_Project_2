@@ -1,10 +1,15 @@
 import json
+import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
+from src.core.events.dispatcher import dispatcher
+from src.core.events.event import Event
 from src.infrastructure.repositories.zone_repositories import ZoneRepository
 from src.models.zone import Zone as ZoneModel
 from src.schemas.zone import ZoneCreateSchema, ZoneUpdateSchema
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/zones", tags=["zones"])
 repo = ZoneRepository()
@@ -77,11 +82,36 @@ def update_zone(zone_id: str, zone_in: ZoneUpdateSchema):
     return json.loads(updated.to_json())
 
 
+def _dispatch_zone_status(zone, new_status: str) -> None:
+    """Fire a ZONE_STATUS_CHANGED event so observers and the audit log react.
+
+    Wrapped in try/except so a misbehaving observer or a Mongo hiccup on
+    the audit-log write cannot break the activate/deactivate response —
+    the user-facing status change is the priority; notifications are
+    best-effort.
+    """
+    try:
+        dispatcher.dispatch(
+            Event(
+                event_type="ZONE_STATUS_CHANGED",
+                data={
+                    "zone_id": str(zone.id),
+                    "new_status": new_status,
+                    "zone_type": getattr(zone, "zone_type", None),
+                    "name": getattr(zone, "name", None),
+                },
+            )
+        )
+    except Exception:  # pragma: no cover
+        logger.exception("Failed to dispatch ZONE_STATUS_CHANGED for %s", zone.id)
+
+
 @router.post("/{zone_id}/activate")
 def activate_zone(zone_id: str):
     zone = repo.activate(zone_id)
     if not zone:
         raise HTTPException(status_code=404, detail="Zone not found")
+    _dispatch_zone_status(zone, "active")
     return json.loads(zone.to_json())
 
 
@@ -90,6 +120,7 @@ def deactivate_zone(zone_id: str):
     zone = repo.deactivate(zone_id)
     if not zone:
         raise HTTPException(status_code=404, detail="Zone not found")
+    _dispatch_zone_status(zone, "inactive")
     return json.loads(zone.to_json())
 
 
