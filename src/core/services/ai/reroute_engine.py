@@ -8,8 +8,9 @@ produces an actionable reroute recommendation.
 
 import logging
 import math
-from datetime import datetime
 from typing import Optional
+
+from src.core.utc import utc_now
 
 from src.core.config import settings
 from src.core.graph_builder import build_navigation_graph
@@ -248,7 +249,7 @@ class RerouteEngine:
             "deltas": reroute_data["deltas"],
             "recommendation": recommendation,
             "reason": reason or "routine_evaluation",
-            "evaluated_at": datetime.utcnow().isoformat(),
+            "evaluated_at": utc_now().isoformat(),
         }
 
     # ------------------------------------------------------------------

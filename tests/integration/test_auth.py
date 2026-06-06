@@ -52,14 +52,14 @@ def _register_admin(client, company_id, email="admin@example.com") -> str:
         json={
             "company_id": company_id,
             "email": email,
-            "password": "supersecret",
+            "password": "supersecret123",
             "full_name": "Admin",
             "role": "admin",
         },
     )
     login = client.post(
         "/api/v1/auth/login",
-        json={"email": email, "password": "supersecret"},
+        json={"email": email, "password": "supersecret123"},
     )
     assert login.status_code == 200
     return login.json()["access_token"]
@@ -70,7 +70,7 @@ class TestBootstrapAndLogin:
         resp = client.post("/api/v1/auth/bootstrap-admin", json={
             "company_id": company_id,
             "email": "first@x.com",
-            "password": "supersecret",
+            "password": "supersecret123",
             "role": "admin",
         })
         assert resp.status_code == 200
@@ -81,7 +81,7 @@ class TestBootstrapAndLogin:
         resp = client.post("/api/v1/auth/bootstrap-admin", json={
             "company_id": company_id,
             "email": "second@x.com",
-            "password": "supersecret",
+            "password": "supersecret123",
             "role": "admin",
         })
         assert resp.status_code == 409
@@ -123,7 +123,7 @@ class TestMeAndRoles:
             json={
                 "company_id": company_id,
                 "email": "viewer@example.com",
-                "password": "supersecret",
+                "password": "supersecret123",
                 "role": "viewer",
             },
         )
@@ -131,7 +131,7 @@ class TestMeAndRoles:
 
         # Log in as viewer
         viewer_token = client.post("/api/v1/auth/login", json={
-            "email": "viewer@example.com", "password": "supersecret",
+            "email": "viewer@example.com", "password": "supersecret123",
         }).json()["access_token"]
 
         # Viewer trying to register another user → 403
@@ -141,7 +141,7 @@ class TestMeAndRoles:
             json={
                 "company_id": company_id,
                 "email": "third@example.com",
-                "password": "supersecret",
+                "password": "supersecret123",
                 "role": "viewer",
             },
         )
@@ -156,7 +156,7 @@ class TestMeAndRoles:
             json={
                 "company_id": other_company_id,
                 "email": "cross-tenant@example.com",
-                "password": "supersecret",
+                "password": "supersecret123",
                 "role": "admin",
             },
         )
@@ -169,3 +169,57 @@ class TestMeAndRoles:
             headers={"Authorization": token},  # missing "Bearer "
         )
         assert resp.status_code == 401
+
+
+class TestPasswordPolicy:
+    def test_short_password_rejected_on_bootstrap(self, client, company_id):
+        resp = client.post("/api/v1/auth/bootstrap-admin", json={
+            "company_id": company_id,
+            "email": "short@x.com",
+            "password": "short12",  # 7 chars
+            "role": "admin",
+        })
+        assert resp.status_code == 422
+
+    def test_eleven_char_password_still_rejected(self, client, company_id):
+        # Boundary: must be at least 12 characters.
+        resp = client.post("/api/v1/auth/bootstrap-admin", json={
+            "company_id": company_id,
+            "email": "boundary@x.com",
+            "password": "elevenchars",  # 11 chars
+            "role": "admin",
+        })
+        assert resp.status_code == 422
+
+
+class TestJWTSecretCheck:
+    def test_check_passes_in_development(self, monkeypatch):
+        from src.main import _check_jwt_secret
+        from src.core.config import settings
+
+        monkeypatch.setattr(settings, "APP_ENV", "development")
+        monkeypatch.setattr(settings, "JWT_SECRET", "dev-only-jwt-secret-anything")
+        _check_jwt_secret()  # no raise
+
+    def test_check_raises_when_default_secret_in_production(self, monkeypatch):
+        import pytest
+
+        from src.main import _check_jwt_secret
+        from src.core.config import settings
+
+        monkeypatch.setattr(settings, "APP_ENV", "production")
+        monkeypatch.setattr(settings, "JWT_SECRET", "dev-only-jwt-secret-please-replace")
+        with pytest.raises(RuntimeError, match="placeholder"):
+            _check_jwt_secret()
+
+    def test_check_passes_when_real_secret_in_production(self, monkeypatch):
+        from src.main import _check_jwt_secret
+        from src.core.config import settings
+
+        monkeypatch.setattr(settings, "APP_ENV", "production")
+        monkeypatch.setattr(
+            settings,
+            "JWT_SECRET",
+            "a-real-long-secret-set-by-the-operator-1234567890",
+        )
+        _check_jwt_secret()  # no raise

@@ -8,7 +8,6 @@ from pathlib import Path
 from bson import ObjectId
 from fastapi import APIRouter, HTTPException
 from concurrent.futures import ThreadPoolExecutor
-from fastapi.responses import FileResponse
 
 from src.schemas.route import RouteCalculationSchema
 from src.core.routing.strategy import (
@@ -457,3 +456,58 @@ def calculate_routes_batch(requests: list[RouteCalculationSchema]):
 
     results = list(executor.map(calculate_single, requests))
     return results
+
+
+# ---------------------------------------------------------------------------
+# Multi-leg voyage planner endpoint (new feature)
+# ---------------------------------------------------------------------------
+
+from src.core.services.multi_leg_planner import MultiLegPlanner  # noqa: E402
+from src.schemas.multi_leg import (  # noqa: E402
+    MultiLegPlanRequest,
+    MultiLegPlanResponse,
+)
+
+
+@router.post("/multi-leg", response_model=MultiLegPlanResponse)
+def plan_multi_leg_voyage(payload: MultiLegPlanRequest):
+    """
+    Plan a voyage that touches an ordered list of ports.
+
+    Set ``optimize_order=True`` to allow the planner to swap intermediate
+    ports (first and last are always honoured) in order to minimise the
+    chosen ``objective`` (``"fuel"`` or ``"distance"``).
+    """
+    # Resolve every port name → graph node id at the edge so callers get
+    # a clean 404 instead of a 500 from somewhere inside A*.
+    try:
+        resolved = [_resolve_node_id(p) for p in payload.port_ids]
+    except HTTPException:
+        raise
+
+    if payload.optimization_mode == "eco":
+        strategy = EcoStrategy()
+    elif payload.optimization_mode == "fastest":
+        strategy = FastestStrategy()
+    else:
+        raise HTTPException(status_code=400, detail="Invalid optimization_mode")
+
+    vessel = _build_vessel_constraints(payload.vessel_id or "", payload.vessel_type)
+
+    planner = MultiLegPlanner(_GRAPH, strategy)
+    plan = (
+        planner.plan_optimised(resolved, vessel=vessel, objective=payload.objective)
+        if payload.optimize_order
+        else planner.plan(resolved, vessel=vessel)
+    )
+
+    if not plan.legs:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No route could be calculated for any leg of the voyage; "
+                "check the port ids and vessel constraints."
+            ),
+        )
+
+    return plan.to_dict(include_waypoints=payload.include_waypoints)

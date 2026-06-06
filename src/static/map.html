@@ -496,6 +496,62 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
 .route-current-item { display: flex; flex-direction: column; gap: 1px; }
 .route-current-label { font-size: 9px; color: var(--text-muted); }
 .route-current-value { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text-primary); }
+
+/* ── Waypoint manager rows ───────────────────────────────────────────── */
+.wp-row {
+  display: grid;
+  grid-template-columns: 18px 1fr 24px 24px;
+  gap: 4px;
+  align-items: center;
+}
+.wp-badge {
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  color: var(--text-muted); text-align: center;
+}
+.wp-row input {
+  width: 100%; background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle); border-radius: 3px;
+  padding: 5px 7px; font-size: 11px; color: var(--text-primary);
+}
+.wp-row input:focus { border-color: var(--accent-dim); outline: none; }
+.wp-row button {
+  background: transparent; border: 1px solid var(--border-subtle);
+  color: var(--text-muted); border-radius: 3px;
+  font-size: 11px; cursor: pointer; padding: 0; height: 24px;
+}
+.wp-row button:hover { color: var(--text-primary); border-color: var(--accent-dim); }
+.wp-row button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── Cost panel — congestion bar ─────────────────────────────────────── */
+.cong-row {
+  display: grid; grid-template-columns: 60px 1fr 50px;
+  gap: 6px; align-items: center; font-size: 10px;
+  padding: 2px 0;
+}
+.cong-row .cong-time { font-family: var(--mono); color: var(--text-muted); }
+.cong-row .cong-bar  {
+  height: 8px; background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle); border-radius: 2px;
+  overflow: hidden;
+}
+.cong-row .cong-bar-fill { height: 100%; transition: width 0.2s ease; }
+.cong-row .cong-val { font-family: var(--mono); text-align: right; }
+.fleet-table { width: 100%; font-size: 10px; border-collapse: collapse; }
+.fleet-table th, .fleet-table td { padding: 4px 6px; border-bottom: 1px solid var(--border-subtle); text-align: left; }
+.fleet-table th { color: var(--text-muted); font-weight: normal; }
+.cii-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-weight: 600; font-family: var(--mono); font-size: 10px; }
+.cii-A { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+.cii-B { background: rgba(132, 204, 22, 0.2); color: #84cc16; }
+.cii-C { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+.cii-D { background: rgba(251, 146, 60, 0.2); color: #fb923c; }
+.cii-E { background: rgba(251, 113, 133, 0.2); color: #fb7185; }
+
+/* ── AIS ship marker ─────────────────────────────────────────────────── */
+.ais-marker {
+  width: 12px; height: 12px;
+  transition: transform 0.3s ease;
+}
+.ais-marker svg { width: 100%; height: 100%; display: block; }
 </style>
 </head>
 <body>
@@ -561,6 +617,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
     </div>
     <div class="tabs">
       <button class="tab active" data-tab="route" onclick="switchTab(this,'route')"><svg><use href="#icon-route"/></svg>Route</button>
+      <button class="tab" data-tab="cost" onclick="switchTab(this,'cost')"><svg><use href="#icon-bolt"/></svg>Cost</button>
       <button class="tab" data-tab="zones" onclick="switchTab(this,'zones')"><svg><use href="#icon-layers"/></svg>Zones</button>
       <button class="tab" data-tab="vessels" onclick="switchTab(this,'vessels')"><svg><use href="#icon-ship"/></svg>Vessels</button>
       <button class="tab" data-tab="weather" onclick="switchTab(this,'weather')"><svg><use href="#icon-cloud"/></svg>Weather</button>
@@ -586,15 +643,43 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
         </div>
         <div class="divider"></div>
         <div>
-          <div class="section-label">Waypoints</div>
-          <div style="display:flex;flex-direction:column;gap:8px">
-            <div class="field"><label>Origin</label><input type="text" id="startNode" placeholder="e.g. Los Angeles or MALTA" value=""/></div>
-            <div class="field"><label>Destination</label><input type="text" id="endNode" placeholder="e.g. Tokyo or PIRAEUS" value=""/></div>
+          <div class="section-label" style="display:flex;justify-content:space-between;align-items:center">
+            <span>Waypoints</span>
+            <span class="hint" id="wp-mode-hint" style="font-size:9px">Origin → Destination</span>
+          </div>
+          <div id="waypointList" style="display:flex;flex-direction:column;gap:6px"></div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="addWaypoint()">+ Add stop</button>
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="pickWaypointOnMap()" id="pickOnMapBtn" title="Click on the map to add a stop">+ From map</button>
+          </div>
+          <div id="multiLegOptions" style="display:none;flex-direction:column;gap:8px;margin-top:10px;padding:8px;background:var(--bg-secondary);border-radius:4px">
+            <div class="toggle-row">
+              <span title="Reorder intermediate stops to minimise fuel or distance. First and last are kept.">Optimise stop order</span>
+              <label class="toggle"><input type="checkbox" id="optimiseOrder"/><span class="toggle-slider"></span></label>
+            </div>
+            <div class="field" id="objectiveField" style="display:none">
+              <label>Objective</label>
+              <select id="multiLegObjective">
+                <option value="fuel">Min fuel</option>
+                <option value="distance">Min distance</option>
+              </select>
+            </div>
           </div>
         </div>
         <div>
           <div class="section-label">Vessel (optional)</div>
           <div class="field"><select id="vesselSelect"><option value="">— Select vessel —</option></select></div>
+        </div>
+        <div>
+          <div class="section-label">Departure</div>
+          <div class="field">
+            <label title="Used to align weather sampling along the route. Defaults to now.">Departure time</label>
+            <input type="datetime-local" id="departureTime"/>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="setDepartureNow()">Now</button>
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="setDepartureClear()">Clear</button>
+          </div>
         </div>
         <button class="btn btn-primary" id="calcBtn" onclick="calculateRoute()">Calculate Route</button>
         <div id="routeResult" style="display:none;flex-direction:column;gap:8px">
@@ -690,8 +775,17 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
             <div class="toggle-row"><span>Rain radar</span><label class="toggle"><input type="checkbox" id="toggleRadar" onchange="toggleRadarLayer(this.checked)"/><span class="toggle-slider"></span></label></div>
             <div class="toggle-row"><span>Click weather</span><label class="toggle"><input type="checkbox" id="toggleWeather" checked onchange="toggleWeatherClick(this.checked)"/><span class="toggle-slider"></span></label></div>
             <div class="toggle-row"><span>Show currents</span><label class="toggle"><input type="checkbox" id="toggleCurrents" onchange="toggleCurrentsLayer(this.checked)"/><span class="toggle-slider"></span></label></div>
+            <div class="toggle-row">
+              <span title="Live AIS positions from aisstream.io">Live ships (AIS)</span>
+              <label class="toggle"><input type="checkbox" id="toggleAis" onchange="toggleAisLayer(this.checked)"/><span class="toggle-slider"></span></label>
+            </div>
           </div>
         </div>
+        <!-- Hidden compatibility inputs — kept so existing route logic that
+             reads #startNode / #endNode continues to work; updated by the
+             waypoint manager below. -->
+        <input type="hidden" id="startNode" />
+        <input type="hidden" id="endNode" />
       </div>
 
       <!-- ZONES PANEL -->
@@ -743,6 +837,73 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-p
         </div>
         <div class="weather-region-list" id="weatherRegionList">
           <div class="weather-region-loading"><span class="spinner"></span> Fetching weather for all regions...</div>
+        </div>
+      </div>
+
+      <!-- COST PANEL -->
+      <div class="panel" id="panel-cost">
+        <div>
+          <div class="section-label">Fuel prices (USD / ton)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <div class="field"><label>HFO</label><input type="number" id="price-HFO" value="550" min="0" step="1"/></div>
+            <div class="field"><label>LFO</label><input type="number" id="price-LFO" value="650" min="0" step="1"/></div>
+            <div class="field"><label>MDO/MGO</label><input type="number" id="price-MDO" value="800" min="0" step="1"/></div>
+            <div class="field"><label>LNG</label><input type="number" id="price-LNG" value="600" min="0" step="1"/></div>
+          </div>
+          <div class="field" style="margin-top:6px">
+            <label>Fuel type used</label>
+            <select id="costFuelType">
+              <option value="HFO">HFO (Heavy Fuel Oil)</option>
+              <option value="LFO">LFO (Light Fuel Oil)</option>
+              <option value="MDO">MDO/MGO</option>
+              <option value="LNG">LNG</option>
+            </select>
+          </div>
+          <div class="toggle-row" style="margin-top:8px">
+            <span title="Apply EU ETS allowance pricing (40 % 2024, 70 % 2025, 100 % 2026+).">Calls at EU port</span>
+            <label class="toggle"><input type="checkbox" id="costCallsEuPort" checked/><span class="toggle-slider"></span></label>
+          </div>
+          <button class="btn btn-primary btn-sm" style="margin-top:10px;width:100%" onclick="calculateRouteCost()" id="costCalcBtn">
+            Calculate cost for current route
+          </button>
+          <div id="costResult" style="display:none;flex-direction:column;gap:6px;margin-top:10px">
+            <div class="section-label">Cost breakdown</div>
+            <div class="route-result">
+              <div class="route-stat"><span class="route-stat-label">Fuel</span><span class="route-stat-val" id="cost-fuel-amt">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">Fuel cost</span><span class="route-stat-val" id="cost-fuel-usd">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">CO₂</span><span class="route-stat-val" id="cost-co2">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">CII attained</span><span class="route-stat-val" id="cost-cii">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">CII rating</span><span class="route-stat-val" id="cost-rating">—</span></div>
+              <div class="route-stat"><span class="route-stat-label">EU ETS cost</span><span class="route-stat-val" id="cost-ets">—</span></div>
+              <div class="route-stat" style="border-top:1px solid var(--border-subtle);padding-top:6px;margin-top:4px"><span class="route-stat-label" style="font-weight:600">Total voyage cost</span><span class="route-stat-val" id="cost-total" style="font-weight:600;color:var(--accent)">—</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="divider"></div>
+
+        <div>
+          <div class="section-label">Fleet emissions</div>
+          <div class="field">
+            <label>Company ID</label>
+            <input type="text" id="fleetCompanyId" placeholder="ObjectId" value="000000000000000000000001"/>
+          </div>
+          <button class="btn btn-ghost btn-sm" style="width:100%" onclick="loadFleetEmissions()">Load fleet summary</button>
+          <div id="fleetEmissionsResult" style="margin-top:8px"></div>
+        </div>
+        <div class="divider"></div>
+
+        <div>
+          <div class="section-label">Port congestion</div>
+          <div class="field">
+            <label>Port</label>
+            <select id="congestionPortSelect"><option value="">— Select port —</option></select>
+          </div>
+          <div class="field">
+            <label>Horizon (hours)</label>
+            <input type="number" id="congestionHorizon" value="24" min="1" max="336"/>
+          </div>
+          <button class="btn btn-ghost btn-sm" style="width:100%" onclick="loadPortCongestion()">Show forecast</button>
+          <div id="congestionResult" style="margin-top:8px"></div>
         </div>
       </div>
 
@@ -865,7 +1026,6 @@ const zoneColors = {
 
 const LAND_GEOJSON_SOURCES = [
   '/api/v1/routes/landmask',
-  '/static/ne_50m_land.geojson',
   'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_land.geojson',
   'https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_land.geojson',
 ];
@@ -1459,6 +1619,8 @@ async function initMap() {
     if (!weatherClickEnabled) return;
     // Don't trigger weather if we're in draw mode
     if (drawnZoneLayer && drawnZoneLayer.getLayers().length > 0) return;
+    // Skip when the user is placing a route waypoint via "+ From map".
+    if (typeof waypointState !== 'undefined' && waypointState.pickingForId) return;
     fetchWeatherForPoint(e.latlng.lat, e.latlng.lng);
   });
 
@@ -3478,6 +3640,535 @@ document.addEventListener('visibilitychange', () => {
     pauseBackgroundTimers();
   }
 });
+
+/* ════════════════════════════════════════════════════════════════════
+ *  Multi-waypoint manager
+ *  ─────────────────────────────────────────────────────────────────
+ *  Replaces the old single-pair Origin/Destination form. The state
+ *  lives in `waypoints` (an array of {value, id}) and is rendered into
+ *  #waypointList. Hidden #startNode/#endNode are kept in sync so
+ *  legacy code paths (graph-mode routing, navigation, AI reroute) keep
+ *  working without modification.
+ * ════════════════════════════════════════════════════════════════════ */
+
+const waypointState = {
+  items: [
+    { id: _wpId(), value: '' },  // origin
+    { id: _wpId(), value: '' },  // destination
+  ],
+  pickingForId: null,            // when set, next map click fills this row
+};
+
+function _wpId() {
+  return 'wp-' + Math.random().toString(36).slice(2, 8);
+}
+
+function renderWaypoints() {
+  const list = document.getElementById('waypointList');
+  if (!list) return;
+  const n = waypointState.items.length;
+  const html = waypointState.items.map((wp, idx) => {
+    const label = idx === 0 ? 'A' : (idx === n - 1 ? 'B' : String.fromCharCode(64 + idx));
+    const labelTitle = idx === 0 ? 'Origin' : (idx === n - 1 ? 'Destination' : `Stop ${idx}`);
+    const placeholder = idx === 0
+      ? 'Origin port or coordinates'
+      : (idx === n - 1 ? 'Destination port or coordinates' : `Stop ${idx} (port or lat,lon)`);
+    const picking = waypointState.pickingForId === wp.id;
+    const inputStyle = picking ? 'border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow)' : '';
+    return `
+      <div class="wp-row" data-id="${wp.id}">
+        <span class="wp-badge" title="${labelTitle}">${label}</span>
+        <input type="text" placeholder="${placeholder}" value="${(wp.value || '').replace(/"/g, '&quot;')}"
+               style="${inputStyle}"
+               oninput="updateWaypointValue('${wp.id}', this.value)"
+               onfocus="waypointState.pickingForId = null; renderWaypoints()"/>
+        <button title="Pick on map" onclick="pickWaypointOnMap('${wp.id}')">⊕</button>
+        <button title="Remove" onclick="removeWaypoint('${wp.id}')" ${n <= 2 ? 'disabled' : ''}>×</button>
+      </div>`;
+  }).join('');
+  list.innerHTML = html;
+
+  // Update the small caption and the multi-leg options block.
+  const hint = document.getElementById('wp-mode-hint');
+  if (hint) hint.textContent = n === 2 ? 'Origin → Destination' : `${n} stops (multi-leg)`;
+  const optsBlock = document.getElementById('multiLegOptions');
+  if (optsBlock) optsBlock.style.display = n >= 3 ? 'flex' : 'none';
+  const objField = document.getElementById('objectiveField');
+  const optChk = document.getElementById('optimiseOrder');
+  if (objField && optChk) objField.style.display = (n >= 3 && optChk.checked) ? 'block' : 'none';
+
+  syncLegacyInputs();
+}
+
+function syncLegacyInputs() {
+  const items = waypointState.items;
+  const sn = document.getElementById('startNode');
+  const en = document.getElementById('endNode');
+  if (sn) sn.value = items[0]?.value || '';
+  if (en) en.value = items[items.length - 1]?.value || '';
+}
+
+function updateWaypointValue(id, value) {
+  const wp = waypointState.items.find(w => w.id === id);
+  if (wp) {
+    wp.value = value;
+    syncLegacyInputs();
+  }
+}
+
+function addWaypoint() {
+  if (waypointState.items.length >= 10) {
+    notify('Max 10 stops per voyage', 'err');
+    return;
+  }
+  // Insert as a new intermediate just before the destination so the
+  // destination always stays the last entry.
+  const lastIdx = waypointState.items.length - 1;
+  waypointState.items.splice(lastIdx, 0, { id: _wpId(), value: '' });
+  renderWaypoints();
+}
+
+function removeWaypoint(id) {
+  if (waypointState.items.length <= 2) return;
+  waypointState.items = waypointState.items.filter(w => w.id !== id);
+  renderWaypoints();
+}
+
+function pickWaypointOnMap(id) {
+  // If no id was passed, target the first empty row, or the destination.
+  if (!id) {
+    const empty = waypointState.items.find(w => !w.value);
+    id = (empty || waypointState.items[waypointState.items.length - 1]).id;
+  }
+  waypointState.pickingForId = id;
+  notify('Click on the map to place this stop', 'info');
+  renderWaypoints();
+}
+
+function _handleMapClickForWaypoint(latlng) {
+  if (!waypointState.pickingForId) return false;
+  const wp = waypointState.items.find(w => w.id === waypointState.pickingForId);
+  if (wp) {
+    wp.value = `${latlng.lat.toFixed(4)},${latlng.lng.toFixed(4)}`;
+    waypointState.pickingForId = null;
+    renderWaypoints();
+    notify('Stop placed ✓');
+  }
+  return true;
+}
+
+// Hook the map click — installed once the map is available.
+function _installWaypointMapHandler() {
+  if (typeof map === 'undefined' || !map || !map.on) {
+    setTimeout(_installWaypointMapHandler, 200);
+    return;
+  }
+  map.on('click', (e) => {
+    if (waypointState.pickingForId) {
+      _handleMapClickForWaypoint(e.latlng);
+    }
+  });
+}
+_installWaypointMapHandler();
+
+// First render once DOM is ready.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', renderWaypoints);
+} else {
+  renderWaypoints();
+}
+
+// Wire optimise-order checkbox.
+document.addEventListener('change', (e) => {
+  if (e.target && e.target.id === 'optimiseOrder') renderWaypoints();
+});
+
+/* ════════════════════════════════════════════════════════════════════
+ *  Departure time
+ * ════════════════════════════════════════════════════════════════════ */
+
+function setDepartureNow() {
+  const el = document.getElementById('departureTime');
+  if (!el) return;
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  el.value = d.toISOString().slice(0, 16);
+}
+
+function setDepartureClear() {
+  const el = document.getElementById('departureTime');
+  if (el) el.value = '';
+}
+
+function getDepartureIso() {
+  const el = document.getElementById('departureTime');
+  if (!el || !el.value) return null;
+  // datetime-local is a wall-clock value; treat it as local time and
+  // convert to an ISO timestamp.
+  return new Date(el.value).toISOString();
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ *  calculateRoute — multi-leg aware
+ *  ────────────────────────────────────────────────────────────────
+ *  Hijacks the original 2-port `calculateRoute` for ≥3 stops. For
+ *  exactly 2 stops, falls back to the original implementation, which
+ *  is preserved as `_calculateRouteSingleLeg`.
+ * ════════════════════════════════════════════════════════════════════ */
+
+const _calculateRouteSingleLeg = calculateRoute;
+
+window.calculateRoute = async function() {
+  const stops = waypointState.items
+    .map(w => (w.value || '').trim())
+    .filter(Boolean);
+
+  if (stops.length < 2) {
+    notify('Add at least an origin and a destination', 'err');
+    return;
+  }
+
+  if (stops.length === 2) {
+    return _calculateRouteSingleLeg();
+  }
+
+  // Multi-leg path
+  const vessel = selectedRouteVesselId || document.getElementById('vesselSelect').value || null;
+  const optimise = document.getElementById('optimiseOrder')?.checked || false;
+  const objective = document.getElementById('multiLegObjective')?.value || 'fuel';
+
+  const btn = document.getElementById('calcBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Planning voyage...';
+  setLoading(true, `Planning ${stops.length}-stop voyage...`);
+
+  try {
+    const resp = await fetch('/api/v1/routes/multi-leg', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        port_ids: stops,
+        optimization_mode: currentStrategy,
+        vessel_id: vessel,
+        optimize_order: optimise,
+        objective,
+        include_waypoints: true,
+      }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || 'Multi-leg planning failed');
+    }
+    const plan = await resp.json();
+    if (plan.legs_failed > 0) {
+      notify(`${plan.legs_failed} leg(s) failed; showing the rest`, 'err');
+    }
+    const synthetic = _multiLegToRouteShape(plan, stops);
+    currentRouteRequest = { multi: true, stops, vessel };
+    displayRoute(synthetic);
+
+    // Show the new port order if it was reshuffled.
+    if (plan.reordered) {
+      notify(`Reordered: ${plan.port_order.join(' → ')}`, 'info');
+    } else {
+      notify(`Voyage planned — ${plan.legs.length} legs ✓`);
+    }
+    fetchRouteWeather(synthetic.waypoints);
+    fetchRouteCurrents(synthetic.waypoints);
+  } catch (e) {
+    notify(e.message || 'Multi-leg planning failed', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Calculate Route';
+    setLoading(false);
+  }
+};
+
+function _multiLegToRouteShape(plan, originalStops) {
+  // Concatenate every leg's waypoints into a single route-shaped object
+  // that `displayRoute` can consume.
+  const merged = [];
+  let seq = 0;
+  (plan.legs || []).forEach((leg, legIdx) => {
+    const wps = leg.waypoints || [];
+    wps.forEach((wp, i) => {
+      // Skip duplicate joiners between legs (end of leg N == start of leg N+1).
+      if (legIdx > 0 && i === 0) return;
+      merged.push({
+        sequence: seq++,
+        coordinates: wp.coordinates,
+        point_type: (i === 0 || i === wps.length - 1) ? 'port' : 'waypoint',
+        name: (i === 0 ? leg.from_port : (i === wps.length - 1 ? leg.to_port : null)),
+      });
+    });
+  });
+
+  return {
+    _id: 'multi-leg-' + Date.now(),
+    waypoints: merged,
+    route_mode: 'multi-leg',
+    total_distance_nm: plan.total_distance_nm,
+    estimated_duration_h: plan.total_duration_h,
+    estimated_fuel_tons: plan.total_fuel_tons,
+    logical_waypoints: (plan.port_order || originalStops).length,
+    vessel_type_used: null,
+  };
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ *  Live AIS layer
+ * ════════════════════════════════════════════════════════════════════ */
+
+let aisLayer = null;
+let aisTimer = null;
+const AIS_POLL_MS = 15000;
+
+async function toggleAisLayer(enabled) {
+  if (enabled) {
+    if (!aisLayer) {
+      aisLayer = L.layerGroup().addTo(map);
+    } else {
+      aisLayer.addTo(map);
+    }
+    await refreshAisLayer();
+    if (aisTimer) clearInterval(aisTimer);
+    aisTimer = setInterval(refreshAisLayer, AIS_POLL_MS);
+  } else {
+    if (aisLayer && map.hasLayer(aisLayer)) map.removeLayer(aisLayer);
+    if (aisTimer) { clearInterval(aisTimer); aisTimer = null; }
+  }
+}
+
+async function refreshAisLayer() {
+  if (!aisLayer || !map.hasLayer(aisLayer)) return;
+  try {
+    const b = map.getBounds();
+    const bbox = `${b.getSouth().toFixed(3)},${b.getWest().toFixed(3)},${b.getNorth().toFixed(3)},${b.getEast().toFixed(3)}`;
+    const resp = await fetch(`/api/v1/ais/vessels?bbox=${bbox}&limit=500`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.enabled) {
+      notify(data.reason || 'AIS not configured', 'err');
+      document.getElementById('toggleAis').checked = false;
+      toggleAisLayer(false);
+      return;
+    }
+    aisLayer.clearLayers();
+    (data.vessels || []).forEach(v => {
+      const heading = v.cog ?? v.heading ?? 0;
+      const icon = L.divIcon({
+        className: 'ais-marker',
+        html: `<div style="transform:rotate(${heading}deg);width:12px;height:12px">
+          <svg viewBox="0 0 24 24" style="display:block">
+            <polygon points="12,2 18,18 12,14 6,18" fill="#22d3ee" stroke="#0b1120" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg></div>`,
+        iconSize: [12, 12],
+        iconAnchor: [6, 6],
+      });
+      L.marker([v.lat, v.lon], { icon })
+        .bindTooltip(
+          `<b>${v.name || 'MMSI ' + v.mmsi}</b><br>` +
+          (v.sog != null ? `${v.sog.toFixed(1)} kn ` : '') +
+          (v.cog != null ? `@ ${v.cog.toFixed(0)}°` : ''),
+          { direction: 'top', offset: [0, -4] }
+        )
+        .addTo(aisLayer);
+    });
+  } catch (err) {
+    console.warn('AIS refresh failed', err);
+  }
+}
+
+// Refresh AIS when the viewport changes (debounced).
+let _aisMoveTimer = null;
+if (typeof map !== 'undefined') {
+  // The map may not be ready yet when this script runs; defer.
+  (function installAisMoveHook() {
+    if (typeof map === 'undefined' || !map || !map.on) {
+      setTimeout(installAisMoveHook, 200);
+      return;
+    }
+    map.on('moveend', () => {
+      if (!aisLayer || !map.hasLayer(aisLayer)) return;
+      clearTimeout(_aisMoveTimer);
+      _aisMoveTimer = setTimeout(refreshAisLayer, 600);
+    });
+  })();
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ *  Cost tab
+ * ════════════════════════════════════════════════════════════════════ */
+
+async function calculateRouteCost() {
+  if (!currentRouteData) {
+    notify('Calculate a route first', 'err');
+    return;
+  }
+  const fuelTons = currentRouteData.estimated_fuel_tons;
+  const distNm = currentRouteData.total_distance_nm;
+  if (!fuelTons || !distNm) {
+    notify('Current route has no fuel/distance estimate', 'err');
+    return;
+  }
+  const fuelType = document.getElementById('costFuelType').value;
+  const callsEu = document.getElementById('costCallsEuPort').checked;
+  const priceKey = fuelType === 'MDO' ? 'MDO' : fuelType;
+  const priceUsd = parseFloat(document.getElementById('price-' + priceKey)?.value) || 0;
+
+  // Look up vessel type from current selection if any.
+  const vesselId = selectedRouteVesselId || document.getElementById('vesselSelect').value;
+  const vessel = getVesselById(vesselId);
+  const vesselType = vessel?.vessel_type || currentRouteData.vessel_type_used || 'bulk_carrier';
+  const dwt = vessel?.specs?.max_cargo_t || vessel?.specs?.cargo_weight_t || 50000;
+
+  const btn = document.getElementById('costCalcBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Computing...';
+  try {
+    const resp = await fetch('/api/v1/emissions/voyage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fuel_tons: fuelTons,
+        vessel_type: vesselType,
+        distance_nm: distNm,
+        dwt_tons: dwt,
+        fuel_type: fuelType,
+        calls_at_eu_port: callsEu,
+      }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || 'Cost calculation failed');
+    }
+    const data = await resp.json();
+    const fuelCostUsd = fuelTons * priceUsd;
+    const etsUsd = (data.eu_ets_allowance_cost_eur || 0) * 1.08;  // rough EUR→USD
+    const total = fuelCostUsd + etsUsd;
+
+    document.getElementById('costResult').style.display = 'flex';
+    document.getElementById('cost-fuel-amt').textContent = `${fuelTons.toFixed(1)} t ${fuelType}`;
+    document.getElementById('cost-fuel-usd').textContent = `$${fuelCostUsd.toLocaleString(undefined, {maximumFractionDigits:0})}`;
+    document.getElementById('cost-co2').textContent = `${(data.co2_tons || 0).toFixed(1)} t`;
+    document.getElementById('cost-cii').textContent = data.cii_attained != null ? data.cii_attained.toFixed(3) : '—';
+    const rating = data.cii_rating || '—';
+    document.getElementById('cost-rating').innerHTML = rating !== '—'
+      ? `<span class="cii-badge cii-${rating}">${rating}</span>`
+      : '—';
+    document.getElementById('cost-ets').textContent = data.eu_ets_allowance_cost_eur
+      ? `€${data.eu_ets_allowance_cost_eur.toLocaleString(undefined,{maximumFractionDigits:0})}`
+      : '—';
+    document.getElementById('cost-total').textContent = `$${total.toLocaleString(undefined,{maximumFractionDigits:0})}`;
+  } catch (e) {
+    notify(e.message || 'Cost calculation failed', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Calculate cost for current route';
+  }
+}
+
+async function loadFleetEmissions() {
+  const cid = document.getElementById('fleetCompanyId').value.trim();
+  const box = document.getElementById('fleetEmissionsResult');
+  if (!cid) { box.innerHTML = '<div class="empty">Enter a company ID first.</div>'; return; }
+  box.innerHTML = '<div class="empty"><span class="spinner"></span> Loading...</div>';
+  try {
+    const resp = await fetch(`/api/v1/emissions/fleet/${encodeURIComponent(cid)}`);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || 'Fleet emissions unavailable');
+    }
+    const data = await resp.json();
+    if (!data.by_vessel || data.by_vessel.length === 0) {
+      box.innerHTML = `<div class="empty">No voyages recorded for this company yet.</div>`;
+      return;
+    }
+    const rows = data.by_vessel.map(v => `
+      <tr>
+        <td>${v.vessel_name || '<em>unknown</em>'}</td>
+        <td>${v.voyages}</td>
+        <td>${v.total_co2_tons.toLocaleString()}</td>
+        <td>${v.rating ? `<span class="cii-badge cii-${v.rating}">${v.rating}</span>` : '—'}</td>
+      </tr>`).join('');
+    box.innerHTML = `
+      <div class="route-stat" style="margin-bottom:6px">
+        <span class="route-stat-label">Voyages</span>
+        <span class="route-stat-val">${data.voyages_considered}</span>
+      </div>
+      <div class="route-stat" style="margin-bottom:6px">
+        <span class="route-stat-label">Fleet CO₂</span>
+        <span class="route-stat-val">${data.fleet_total_co2_tons.toLocaleString()} t</span>
+      </div>
+      <table class="fleet-table">
+        <thead><tr><th>Vessel</th><th>Voy.</th><th>CO₂ (t)</th><th>CII</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  } catch (e) {
+    box.innerHTML = `<div class="empty">${e.message || 'Failed to load.'}</div>`;
+  }
+}
+
+async function loadCongestionPorts() {
+  const sel = document.getElementById('congestionPortSelect');
+  if (!sel || sel.options.length > 1) return;
+  try {
+    const resp = await fetch('/api/v1/ports');
+    if (!resp.ok) return;
+    const ports = await resp.json();
+    (ports || []).forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.port_id;
+      opt.textContent = `${p.name || p.port_id} (${p.port_id})`;
+      sel.appendChild(opt);
+    });
+  } catch {}
+}
+
+async function loadPortCongestion() {
+  const portId = document.getElementById('congestionPortSelect').value;
+  const horizon = parseInt(document.getElementById('congestionHorizon').value, 10) || 24;
+  const box = document.getElementById('congestionResult');
+  if (!portId) { box.innerHTML = '<div class="empty">Pick a port first.</div>'; return; }
+  box.innerHTML = '<div class="empty"><span class="spinner"></span> Forecasting...</div>';
+  try {
+    const resp = await fetch(`/api/v1/ports/${encodeURIComponent(portId)}/congestion?horizon_hours=${horizon}`);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || 'Forecast failed');
+    }
+    const data = await resp.json();
+    const buckets = data.buckets || [];
+    if (!buckets.length) {
+      box.innerHTML = '<div class="empty">No data.</div>';
+      return;
+    }
+    const bars = buckets.map(b => {
+      const pct = Math.round((b.projected_occupancy || 0) * 100);
+      const hr = new Date(b.start_at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+      const color = pct >= 80 ? '#fb7185' : pct >= 50 ? '#fbbf24' : '#4ade80';
+      return `
+        <div class="cong-row">
+          <span class="cong-time">${hr}</span>
+          <div class="cong-bar"><div class="cong-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <span class="cong-val">${pct}%</span>
+        </div>`;
+    }).join('');
+    box.innerHTML = `
+      <div class="route-stat"><span class="route-stat-label">Berths</span><span class="route-stat-val">${data.berth_count}</span></div>
+      <div class="route-stat"><span class="route-stat-label">Peak occ.</span><span class="route-stat-val">${Math.round((data.peak_congestion_score||0)*100)}%</span></div>
+      <div style="margin-top:8px;max-height:240px;overflow-y:auto">${bars}</div>`;
+  } catch (e) {
+    box.innerHTML = `<div class="empty">${e.message || 'Failed.'}</div>`;
+  }
+}
+
+// Pre-populate the port dropdown on first tab visit. Hook into switchTab.
+const _origSwitchTab = switchTab;
+window.switchTab = function(el, tab) {
+  _origSwitchTab(el, tab);
+  if (tab === 'cost') loadCongestionPorts();
+};
 </script>
 </body>
 </html>

@@ -7,9 +7,9 @@ as the event handler for the Observer-based event system.
 """
 
 import logging
-from datetime import datetime
 from typing import Optional
 
+from src.core.utc import utc_now
 from src.core.services.ai.anomaly_detector import AnomalyDetector
 from src.core.services.ai.eta_predictor import ETAPredictor
 from src.core.services.ai.recommendation_engine import RecommendationEngine
@@ -133,7 +133,7 @@ class AIService:
 
         import json
         result = json.loads(updated.to_json())
-        result["applied_at"] = datetime.utcnow().isoformat()
+        result["applied_at"] = utc_now().isoformat()
         return result
 
     # ------------------------------------------------------------------

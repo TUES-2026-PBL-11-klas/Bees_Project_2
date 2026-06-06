@@ -8,9 +8,9 @@ a unique index on company_id).
 
 from __future__ import annotations
 
-from datetime import datetime
-
 import mongoengine as me
+
+from src.core.utc import utc_now
 
 
 class BillingAddress(me.EmbeddedDocument):
@@ -44,8 +44,8 @@ class BillingData(me.Document):
     subscription_started_at = me.DateTimeField()
     subscription_renews_at = me.DateTimeField()
     usage = me.EmbeddedDocumentListField(UsageRecord, default=list)
-    created_at = me.DateTimeField(default=datetime.utcnow)
-    updated_at = me.DateTimeField(default=datetime.utcnow)
+    created_at = me.DateTimeField(default=utc_now)
+    updated_at = me.DateTimeField(default=utc_now)
 
     meta = {
         "collection": "billing_data",
@@ -56,4 +56,4 @@ class BillingData(me.Document):
     }
 
     def touch(self) -> None:
-        self.updated_at = datetime.utcnow()
+        self.updated_at = utc_now()

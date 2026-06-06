@@ -96,13 +96,13 @@ def _pick_current_values(hourly: dict, fields: list[str]) -> dict:
     *not* "now" — it is midnight.  We match the current hour against the
     ``time`` array and fall back to the first sample if anything is off.
     """
-    import datetime as _dt
+    from src.core.utc import utc_now
 
     out: dict = {}
     times = hourly.get("time") if isinstance(hourly, dict) else None
     idx = 0
     if isinstance(times, list) and times:
-        now_hour = _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:00")
+        now_hour = utc_now().strftime("%Y-%m-%dT%H:00")
         try:
             idx = times.index(now_hour)
         except ValueError:

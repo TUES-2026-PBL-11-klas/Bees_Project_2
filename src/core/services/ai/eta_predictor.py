@@ -9,10 +9,9 @@ more realistic arrival estimate than raw distance / speed.
 import logging
 import math
 from datetime import datetime
-from typing import Optional
 
 from src.core.config import settings
-from src.core.routing.strategy import DEFAULT_SPEED_KNOTS, METRES_PER_NM
+from src.core.routing.strategy import DEFAULT_SPEED_KNOTS
 
 logger = logging.getLogger(__name__)
 

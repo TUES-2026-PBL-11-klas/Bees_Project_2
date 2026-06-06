@@ -33,12 +33,31 @@ class EventDispatcher:
     def dispatch(self, event):
         observers = self._subscribers.get(event.event_type, [])
 
-        self._audit_repo.create_log(event.event_type, event.data)
-        self._audit_repo.create_log(
-            event_type=event.event_type,
-            data=event.data,
-            entity_id=event.data.get("zone_id")
+        # Persist a single audit log entry per dispatched event. If the
+        # payload carries an entity reference (zone_id / vessel_id /
+        # route_id), record it on the log so the entry is queryable.
+        data = event.data or {}
+        entity_id = (
+            data.get("zone_id")
+            or data.get("vessel_id")
+            or data.get("route_id")
         )
+        entity_type = None
+        if data.get("zone_id"):
+            entity_type = "zone"
+        elif data.get("vessel_id"):
+            entity_type = "vessel"
+        elif data.get("route_id"):
+            entity_type = "route"
+        try:
+            self._audit_repo.create_log(
+                event_type=event.event_type,
+                data=data,
+                entity_type=entity_type,
+                entity_id=entity_id,
+            )
+        except Exception:  # pragma: no cover - audit failures must not break dispatch
+            logger.exception("Failed to write audit log for event %s", event.event_type)
 
         for observer in observers:
             self._executor.submit(observer.update, event)

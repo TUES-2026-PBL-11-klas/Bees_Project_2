@@ -34,3 +34,19 @@ from src.models.ai_models import (
 )
 from src.models.route_history import RouteHistory
 from src.models.port_scheduling import Port, PortSchedule, DockReservation
+
+__all__ = [
+    "Company",
+    "BulkCarrier", "CarCarrier", "ChemicalTanker", "ContainerShip", "CruiseShip",
+    "Dredger", "Ferry", "FishingVessel", "Icebreaker", "LNGCarrier", "LPGCarrier",
+    "OffshoreSupport", "PassengerShip", "PatrolBoat", "ResearchVessel", "RoRoShip",
+    "Tanker", "Tugboat", "Vessel", "Yacht",
+    "Zone",
+    "RouteRequest",
+    "Route",
+    "Event",
+    "AuditLog",
+    "AnomalyRecord", "RerouteLog", "AIRecommendation", "ETAPrediction",
+    "RouteHistory",
+    "Port", "PortSchedule", "DockReservation",
+]

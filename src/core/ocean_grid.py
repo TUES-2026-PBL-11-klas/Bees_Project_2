@@ -10,8 +10,6 @@ edges, guarantees that A* can find a path between any two ports on Earth.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
-from typing import Optional
 
 from src.core.graph import Waypoint
 

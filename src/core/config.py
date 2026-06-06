@@ -1,7 +1,9 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
     MONGODB_URI: str = "mongodb://localhost:27017"
     DB_NAME: str = "clearwake"
     APP_PORT: int = 8080
@@ -22,12 +24,11 @@ class Settings(BaseSettings):
     AI_WEATHER_FACTOR_WINTER: float = 1.15
 
     # JWT auth — change JWT_SECRET in production.
-    JWT_SECRET: str = "dev-only-secret-change-me"
+    # Default is 48 bytes so PyJWT does not warn about HMAC-SHA256
+    # key length in dev; the value is still a clearly-fake placeholder
+    # that the lifespan check refuses to let through in non-dev envs.
+    JWT_SECRET: str = "dev-only-jwt-secret-please-replace-in-production"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRES_MINUTES: int = 60
-
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
 
 settings = Settings()

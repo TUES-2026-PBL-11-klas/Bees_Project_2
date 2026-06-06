@@ -1,7 +1,7 @@
-from datetime import datetime
-
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
+
+from src.core.utc import utc_now
 
 from src.api.auth_dependencies import get_current_user, require_role
 from src.core.config import settings
@@ -83,7 +83,7 @@ def login(payload: LoginSchema):
     if not user or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = utc_now()
     user.save()
 
     token = issue_access_token(

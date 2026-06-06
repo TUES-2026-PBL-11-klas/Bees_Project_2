@@ -1,9 +1,11 @@
 from fastapi import APIRouter
 from src.api.v1.routers import (
+    ais,
     analytics,
     auth,
     billing_data,
     companies,
+    emissions,
     fleet,
     fleet_profiles,
     jobs,
@@ -33,3 +35,5 @@ router.include_router(analytics.router)
 router.include_router(port_scheduling.router)
 router.include_router(optimization.router)
 router.include_router(jobs.router)
+router.include_router(emissions.router)
+router.include_router(ais.router)

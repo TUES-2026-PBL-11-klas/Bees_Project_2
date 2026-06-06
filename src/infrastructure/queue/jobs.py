@@ -77,6 +77,27 @@ def run_ai_reroute(vessel_id: str, reason: str = "scheduled") -> dict:
         raise
 
 
+def run_weather_zone_refresh(
+    valid_hours: int = 12,
+    wave_height_threshold_m: float = 4.0,
+    wind_speed_threshold_ms: float = 20.0,
+) -> dict:
+    """
+    Scan live weather samples and upsert temporary storm zones.
+
+    Designed to be run on a schedule (e.g. every 30 minutes) so the
+    routing graph always reflects the latest sea state without anyone
+    having to draw zones by hand.
+    """
+    from src.core.services.weather_zone_service import weather_zone_refresh_job
+
+    return weather_zone_refresh_job(
+        valid_hours=valid_hours,
+        wave_height_threshold_m=wave_height_threshold_m,
+        wind_speed_threshold_ms=wind_speed_threshold_ms,
+    )
+
+
 def run_weather_refresh(lat: float, lon: float) -> dict:
     """
     Pre-warm the current cache at a coordinate.
