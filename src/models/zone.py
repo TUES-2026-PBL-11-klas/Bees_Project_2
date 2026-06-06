@@ -1,5 +1,6 @@
 import mongoengine as me
-from datetime import datetime
+
+from src.core.utc import utc_now
 
 class Zone(me.Document):
     name = me.StringField(required=True)
@@ -9,7 +10,7 @@ class Zone(me.Document):
     description = me.StringField()
     valid_from = me.DateTimeField()
     valid_until = me.DateTimeField()
-    created_at = me.DateTimeField(default=datetime.utcnow)
+    created_at = me.DateTimeField(default=utc_now)
 
     meta = {
         "collection": "zones",

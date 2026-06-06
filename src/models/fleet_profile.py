@@ -8,9 +8,9 @@ downstream services can apply policy without re-reading every vessel.
 
 from __future__ import annotations
 
-from datetime import datetime
-
 import mongoengine as me
+
+from src.core.utc import utc_now
 
 
 class FleetProfile(me.Document):
@@ -23,8 +23,8 @@ class FleetProfile(me.Document):
     )
     preferred_route_ids = me.ListField(me.ObjectIdField(), default=list)
     emission_target_kg_co2_per_nm = me.FloatField()
-    created_at = me.DateTimeField(default=datetime.utcnow)
-    updated_at = me.DateTimeField(default=datetime.utcnow)
+    created_at = me.DateTimeField(default=utc_now)
+    updated_at = me.DateTimeField(default=utc_now)
 
     meta = {
         "collection": "fleet_profiles",
@@ -35,4 +35,4 @@ class FleetProfile(me.Document):
     }
 
     def touch(self) -> None:
-        self.updated_at = datetime.utcnow()
+        self.updated_at = utc_now()

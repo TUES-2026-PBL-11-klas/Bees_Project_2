@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import List, Optional
 
 from bson import ObjectId
+
+from src.core.utc import utc_now
 
 from src.models.port_scheduling import DockReservation, Port, PortSchedule
 
@@ -34,7 +35,7 @@ class PortScheduleRepository:
         else:
             for key, value in data.items():
                 setattr(schedule, key, value)
-        schedule.updated_at = datetime.utcnow()
+        schedule.updated_at = utc_now()
         schedule.save()
         return schedule
 

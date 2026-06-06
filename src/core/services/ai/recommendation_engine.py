@@ -10,6 +10,8 @@ import logging
 from datetime import datetime
 from typing import Optional
 
+from src.core.utc import utc_now
+
 from src.core.config import settings
 from src.core.routing.strategy import DEFAULT_SPEED_KNOTS
 
@@ -195,7 +197,7 @@ class RecommendationEngine:
             "confidence": confidence,
             "priority": priority,
             "status": "active",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": utc_now().isoformat(),
         }
 
     def _generate_speed_advisory(
@@ -239,7 +241,7 @@ class RecommendationEngine:
             "confidence": 0.85,
             "priority": "medium",
             "status": "active",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": utc_now().isoformat(),
         }
 
     def _generate_zone_avoidance(
@@ -328,7 +330,7 @@ class RecommendationEngine:
             "confidence": 0.75,
             "priority": "high",
             "status": "active",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": utc_now().isoformat(),
         }
 
     def _generate_weather_advisory(
@@ -387,5 +389,5 @@ class RecommendationEngine:
             "confidence": confidence,
             "priority": priority,
             "status": "active",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": utc_now().isoformat(),
         }
