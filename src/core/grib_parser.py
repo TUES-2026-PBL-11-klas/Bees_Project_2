@@ -18,7 +18,7 @@ import logging
 import math
 import time
 from dataclasses import dataclass, field
-from typing import Optional, Tuple
+from typing import Optional
 
 import httpx
 

@@ -11,7 +11,7 @@ import math
 from typing import Optional
 
 from src.core.config import settings
-from src.core.routing.strategy import DEFAULT_SPEED_KNOTS, METRES_PER_NM
+from src.core.routing.strategy import DEFAULT_SPEED_KNOTS
 from src.core.utc import utc_now
 
 logger = logging.getLogger(__name__)

@@ -1,5 +1,3 @@
-import mongoengine as me
-from datetime import datetime
 from src.models.audit_log import AuditLog
 
 class AuditLogRepository:

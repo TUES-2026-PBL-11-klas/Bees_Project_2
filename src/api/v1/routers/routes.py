@@ -8,7 +8,6 @@ from pathlib import Path
 from bson import ObjectId
 from fastapi import APIRouter, HTTPException
 from concurrent.futures import ThreadPoolExecutor
-from fastapi.responses import FileResponse
 
 from src.schemas.route import RouteCalculationSchema
 from src.core.routing.strategy import (

@@ -2,3 +2,14 @@ from src.exceptions.base import BaseAppException, ValidationException, NotFoundE
 from src.exceptions.zone_exceptions import ZoneIntersectionException
 from src.exceptions.vessel_exceptions import InvalidSpeedException, InvalidWeightException
 from src.exceptions.routing_exceptions import RouteNotFoundException
+
+__all__ = [
+    "BaseAppException",
+    "ValidationException",
+    "NotFoundException",
+    "ConflictException",
+    "ZoneIntersectionException",
+    "InvalidSpeedException",
+    "InvalidWeightException",
+    "RouteNotFoundException",
+]
