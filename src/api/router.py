@@ -4,6 +4,7 @@ from src.api.v1.routers import (
     auth,
     billing_data,
     companies,
+    emissions,
     fleet,
     fleet_profiles,
     jobs,
@@ -33,3 +34,4 @@ router.include_router(analytics.router)
 router.include_router(port_scheduling.router)
 router.include_router(optimization.router)
 router.include_router(jobs.router)
+router.include_router(emissions.router)
