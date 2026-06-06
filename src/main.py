@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -11,6 +12,7 @@ from src.api.v1.routers.ai import ws_notifications, ws_manager
 from src.core.config import settings
 from src.core.events.ai_observer import register_ai_observer
 from src.core.events.dispatcher import dispatcher
+from src.core.services import ais_service
 from src.infrastructure.database.database import close_db, init_db
 from prometheus_fastapi_instrumentator import Instrumentator
 
@@ -39,7 +41,27 @@ async def lifespan(app: FastAPI):
     register_ai_observer()
     dispatcher.set_ws_manager(ws_manager)
     logger.info("AI module initialised (observer + WebSocket manager)")
+
+    # Live AIS feed — only starts if AIS_API_KEY is configured.
+    ais_consumer = ais_service.make_consumer()
+    ais_task: asyncio.Task | None = None
+    if ais_consumer is not None:
+        ais_task = asyncio.create_task(ais_consumer.run(), name="ais-stream-consumer")
+        logger.info("AIS stream consumer started")
+    else:
+        logger.info("AIS stream disabled (no AIS_API_KEY set)")
+
     yield
+
+    if ais_consumer is not None:
+        ais_consumer.stop()
+    if ais_task is not None:
+        ais_task.cancel()
+        try:
+            await ais_task
+        except (asyncio.CancelledError, Exception):
+            pass
+
     close_db()
     from src.api.v1.routers.weather import _close_client
     await _close_client()

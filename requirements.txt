@@ -20,3 +20,6 @@ pymongo
 prometheus-fastapi-instrumentator
 
 PyJWT
+
+# Live AIS feed (aisstream.io WebSocket)
+websockets
